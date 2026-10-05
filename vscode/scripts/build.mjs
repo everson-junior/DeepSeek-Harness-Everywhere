@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(__dirname, '..')
-const repoRoot = resolve(appRoot, '../..')
+// Try local appRoot node_modules first, fallback to parent if in monorepo
+const localNodeModules = join(appRoot, 'node_modules')
+const repoRoot = existsSync(localNodeModules) ? appRoot : resolve(appRoot, '../..')
 const binSuffix = process.platform === 'win32' ? '.cmd' : ''
 
 function runExecutable(file, args, options) {
@@ -26,14 +28,20 @@ function runEsbuild(file, args, options) {
 }
 
 console.log('1. Typechecking apps/vscode...')
-const tscBin = resolve(repoRoot, 'node_modules/.bin', `tsc${binSuffix}`)
+const tscBin = existsSync(resolve(appRoot, 'node_modules/.bin', `tsc${binSuffix}`))
+  ? resolve(appRoot, 'node_modules/.bin', `tsc${binSuffix}`)
+  : resolve(repoRoot, 'node_modules/.bin', `tsc${binSuffix}`)
+
 runExecutable(tscBin, ['-p', join(appRoot, 'tsconfig.json')], {
-  cwd: repoRoot,
+  cwd: appRoot,
   stdio: 'inherit',
 })
 
 console.log('2. Locating esbuild binary...')
 function findEsbuildBin() {
+  const localDirect = resolve(appRoot, 'node_modules/.bin', `esbuild${binSuffix}`)
+  if (existsSync(localDirect)) return localDirect
+
   const pnpmDir = resolve(repoRoot, 'node_modules/.pnpm')
   if (existsSync(pnpmDir)) {
     const entries = readdirSync(pnpmDir)

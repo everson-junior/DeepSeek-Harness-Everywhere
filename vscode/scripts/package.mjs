@@ -28,8 +28,6 @@ const vsixPath = join(appRoot, vsixName)
 runExecutable(
   process.platform === 'win32' ? 'npx.cmd' : 'npx',
   [
-    '--prefix',
-    resolve(appRoot, '../..'),
     '@vscode/vsce',
     'package',
     '--no-dependencies',
