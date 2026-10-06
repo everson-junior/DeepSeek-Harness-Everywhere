@@ -1,4 +1,4 @@
-name: Release & Publish VS Code Extension
+name: Release & Publish Extensions (VS Code & Visual Studio)
 
 on:
   release:
@@ -74,3 +74,39 @@ jobs:
           VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
         run: |
           echo "::notice title=Marketplace Publish Skipped::O arquivo .vsix foi gerado e anexado aos artefatos da Release. Para habilitar a publicação automática no Visual Studio Marketplace, adicione o secret 'VS_MARKETPLACE_TOKEN' nas configurações do repositório (Settings -> Secrets and variables -> Actions)."
+
+  build-visualstudio-2022:
+    name: Build Visual Studio 2022 VSIX
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore visualstudio/Everywhere.sln
+
+      - name: Build VSIX with MSBuild
+        run: msbuild visualstudio/Everywhere.sln /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true
+
+      - name: Upload VS 2022 VSIX as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: everywhere-visualstudio-2022-vsix
+          path: visualstudio/**/bin/Release/*.vsix
+          retention-days: 30
+
+      - name: Attach VS 2022 VSIX to GitHub Release Assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: visualstudio/**/bin/Release/*.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

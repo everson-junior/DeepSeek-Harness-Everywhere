@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidEverywherePackage">
+    <Buttons>
+      <Button guid="guidEverywherePackageCmdSet" id="cmdidEverywhereToolWindowCommand" priority="0x0100" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTHRWNDWS1"/>
+        <Icon guid="guidImages" id="bmpPic1" />
+        <Strings>
+          <ButtonText>Everywhere (DeepSeek Harness)</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+
+    <Bitmaps>
+      <Bitmap guid="guidImages" href="Resources\Icon.png" usedList="bmpPic1"/>
+    </Bitmaps>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidEverywherePackage" value="{a5323a67-932f-45b7-87dc-4db7eb0b1f20}" />
+
+    <GuidSymbol name="guidEverywherePackageCmdSet" value="{9c193563-7182-4f76-92f7-e2c7c59c5d14}">
+      <IDSymbol name="cmdidEverywhereToolWindowCommand" value="0x0100" />
+    </GuidSymbol>
+
+    <GuidSymbol name="guidImages" value="{7e8346e9-dfc4-42f1-bbba-c3cf2c97a89e}" >
+      <IDSymbol name="bmpPic1" value="1" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

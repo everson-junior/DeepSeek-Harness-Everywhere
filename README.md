@@ -7,6 +7,7 @@
 **DeepSeek Harness Everywhere — Conectando suas IDEs ao DeepSeek**
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visualstudiocode)](./vscode)
+[![Visual Studio 2022](https://img.shields.io/badge/Visual%20Studio-2022%20(v17.0%2B)-purple?logo=visualstudio)](./visualstudio)
 [![DeepSeek](https://img.shields.io/badge/AI-DeepSeek--V3%20%7C%20DeepSeek--R1-007acc)](https://deepseek.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-success)]()
@@ -16,6 +17,7 @@
 [Visão Geral](#-visão-geral) •
 [Recursos](#-recursos-principais) •
 [Extensão VS Code](#-extensão-vs-code) •
+[Extensão Visual Studio 2022](#-extensão-visual-studio-2022) •
 [Instalação e Uso](#-instalação-e-uso) •
 [Configurações](#-configurações) •
 [Estrutura do Projeto](#-estrutura-do-projeto)
@@ -52,10 +54,23 @@ A extensão oficial para **Visual Studio Code** está localizada no diretório [
 
 | Local | Ação | Descrição |
 |---|---|---|
-| **Activity Bar** | Ícone EverDock / DeepSeek | Abre a interface de chat na barra lateral |
+| **Activity Bar** | Ícone Everywhere / DeepSeek | Abre a interface de chat na barra lateral |
 | **Menu Superior** | Iniciar / Parar / Reiniciar | Controle manual do serviço em execução |
 | **Barra de Status** | Indicador de Status | Exibe se o agente está ativo, porta em uso e atalhos rápidos |
 | **Abas do Editor** | Abrir em Aba Dedicada | Expande a visualização para trabalhar em tela cheia |
+
+---
+
+## 🪟 Extensão Visual Studio 2022
+
+A extensão oficial para **Microsoft Visual Studio 2022** (IDE clássica x64) está localizada no diretório [`/visualstudio`](./visualstudio).
+
+### Características
+- **Tool Window Nativa com Microsoft Edge WebView2 + WPF**: Renderização fluida, moderna e com aceleração gráfica da interface do DeepSeek Harness.
+- **Solution Binding Automático**: Roda contextualmente vinculado à pasta da Solution aberta no Visual Studio.
+- **Auto-Recuperação (Exit Code 1)**: Mata processos órfãos e portas presas e reconecta automaticamente.
+- **Menu Integrado**: Disponível em `View` ➔ `Other Windows` ➔ `Everywhere (DeepSeek Harness)`.
+- **Configuração no Visual Studio**: Opções em `Tools` ➔ `Options` ➔ `Everywhere`.
 
 ---
 
@@ -128,7 +143,19 @@ everywhere/
 ├── assets/
 │   ├── icon/                   # Ícone oficial em alta resolução (PNG / JPG)
 │   └── everdock-banner.jpg     # Banner oficial da extensão
-├── vscode/
+├── visualstudio/               # Extensão para Microsoft Visual Studio 2022 (C# / WPF / VSIX)
+│   ├── Everywhere.sln          # Solution do Visual Studio 2022
+│   ├── Everywhere/
+│   │   ├── Everywhere.csproj   # Projeto C# SDK-style (.NET Framework 4.8)
+│   │   ├── EverywherePackage.cs# AsyncPackage principal
+│   │   ├── EverywherePackage.vsct # Tabela de comandos e menus
+│   │   ├── source.extension.vsixmanifest # Manifesto VSIX v3 para VS 2022 x64
+│   │   ├── ToolWindows/        # Tool Window com Microsoft Edge WebView2
+│   │   ├── Services/           # DshManager (auto-retry exit code 1 e limpeza de processos)
+│   │   ├── Options/            # Página de configurações em Tools -> Options
+│   │   └── Resources/          # Ícone e Preview VSIX
+│   └── README.md               # Documentação da extensão Visual Studio 2022
+├── vscode/                     # Extensão para Visual Studio Code (TypeScript / Webview)
 │   ├── assets/
 │   │   └── icon/               # Ícone empacotado da extensão
 │   ├── media/
