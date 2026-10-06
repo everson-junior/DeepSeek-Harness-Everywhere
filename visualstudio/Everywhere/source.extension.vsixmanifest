@@ -4,7 +4,7 @@
     <Identity Id="Everywhere.DeepSeek.VSIX" Version="0.1.0" Language="en-US" Publisher="Everywhere" />
     <DisplayName>Everywhere - DeepSeek Harness for Visual Studio</DisplayName>
     <Description xml:space="preserve">Connect Visual Studio 2022 to the official DeepSeek Harness autonomous AI agent runtime. Full tool calling, autonomous workspace inspection and live reasoning in your IDE.</Description>
-    <MoreInfo>https://github.com/everson-junior/everdock</MoreInfo>
+    <MoreInfo>https://github.com/everson-junior/DeepSeek-Harness-Everywhere</MoreInfo>
     <License>LICENSE</License>
     <Icon>Resources\Icon.png</Icon>
     <PreviewImage>Resources\Preview.png</PreviewImage>

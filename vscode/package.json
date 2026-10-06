@@ -8,8 +8,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "apps/vscode"
+    "url": "https://github.com/everson-junior/DeepSeek-Harness-Everywhere.git",
+    "directory": "vscode"
   },
   "engines": {
     "vscode": "^1.90.0"
