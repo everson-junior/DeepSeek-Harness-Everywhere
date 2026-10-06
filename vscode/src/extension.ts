@@ -156,6 +156,24 @@ export function activate(context: vscode.ExtensionContext): void {
         await vscode.commands.executeCommand('deepseek.harnessView.focus')
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('exited with code 1')) {
+          try {
+            outputChannel.appendLine('[DeepSeek Harness] Handling exit code 1 fallback: stopping service and retrying...')
+            await dshManager.stop()
+            await new Promise((r) => setTimeout(r, 1000))
+            await dshManager.start()
+            await vscode.commands.executeCommand('deepseek.harnessView.focus')
+            return
+          } catch (retryErr: unknown) {
+            const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+            vscode.window.showErrorMessage(`Failed to start DeepSeek Harness: ${retryMsg}`, 'Show Logs').then((action) => {
+              if (action === 'Show Logs') {
+                outputChannel.show(true)
+              }
+            })
+            return
+          }
+        }
         vscode.window.showErrorMessage(`Failed to start DeepSeek Harness: ${msg}`, 'Show Logs').then((action) => {
           if (action === 'Show Logs') {
             outputChannel.show(true)

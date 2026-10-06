@@ -1,10 +1,16 @@
-# DeepSeek Harness for Visual Studio Code
+<div align="center">
 
-English | [中文](README.zh.md)
+<img src="./media/everdock-banner.jpg" alt="Everywhere - Conectando suas IDEs ao DeepSeek" width="100%" />
 
-Run the official **DeepSeek Harness** autonomous AI agent directly inside Visual Studio Code.
+# Everywhere: DeepSeek Harness for Visual Studio Code
 
-Instead of a standalone chat mock, this extension launches and manages the authentic DeepSeek Harness agent engine (`dsh`) bound to your current workspace, providing the full web interface, autonomous tool pipeline, file inspection/editing, and session history directly within your IDE.
+English | [Português](../README.md) | [中文](README.zh.md)
+
+</div>
+
+Run the official **DeepSeek Harness** autonomous AI agent everywhere directly inside Visual Studio Code.
+
+**Everywhere** embeds and manages the authentic DeepSeek Harness agent engine (`dsh`) bound to your current workspace, providing the full web interface, autonomous tool pipeline, file inspection/editing, and session history directly within your IDE.
 
 ---
 

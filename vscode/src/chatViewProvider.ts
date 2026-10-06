@@ -360,13 +360,17 @@ function getHtmlForStatus(info: HarnessInfo): string {
   <div class="card">
     <h2>Harness Startup Failed</h2>
     <div class="error-box">${info.error ?? 'Unknown error occurred'}</div>
-    <button class="btn primary" id="btn-restart">Retry Start</button>
-    <button class="btn secondary" id="btn-logs">Show Logs</button>
+    <button class="btn primary" id="btn-restart">🔄 Reiniciar Chat</button>
+    <button class="btn secondary" id="btn-stop">🛑 Parar Serviço</button>
+    <button class="btn secondary" id="btn-logs">📋 Show Logs</button>
   </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     document.getElementById('btn-restart').addEventListener('click', () => {
-      vscode.postMessage({ command: 'start' });
+      vscode.postMessage({ command: 'restart' });
+    });
+    document.getElementById('btn-stop').addEventListener('click', () => {
+      vscode.postMessage({ command: 'stop' });
     });
     document.getElementById('btn-logs').addEventListener('click', () => {
       vscode.postMessage({ command: 'showLogs' });
@@ -472,6 +476,9 @@ export class DeepSeekHarnessViewProvider implements vscode.WebviewViewProvider {
         case 'restart':
           await vscode.commands.executeCommand('deepseek.restartHarness')
           break
+        case 'stop':
+          await vscode.commands.executeCommand('deepseek.stopHarness')
+          break
         case 'openEditorTab':
           await vscode.commands.executeCommand('deepseek.openFullView')
           break
@@ -489,7 +496,11 @@ export class DeepSeekHarnessViewProvider implements vscode.WebviewViewProvider {
 
     void this.dshManager.initStatus().then(() => {
       this.updateWebviewContent(this.dshManager.info)
-
+      if (this.config.autoStart && this.dshManager.info.status === 'stopped') {
+        this.dshManager.start().catch((err: Error) => {
+          vscode.window.showErrorMessage(`DeepSeek Harness: ${err.message}`)
+        })
+      }
     })
   }
 
@@ -527,6 +538,12 @@ export function openHarnessInEditorTab(
     switch (data.command) {
       case 'start':
         await vscode.commands.executeCommand('deepseek.startHarness')
+        break
+      case 'stop':
+        await vscode.commands.executeCommand('deepseek.stopHarness')
+        break
+      case 'restart':
+        await vscode.commands.executeCommand('deepseek.restartHarness')
         break
       case 'install':
         await vscode.commands.executeCommand('deepseek.installHarness')

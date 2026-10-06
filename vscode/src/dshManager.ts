@@ -160,6 +160,39 @@ async function stopProcessOnPort(
   })
 }
 
+async function stopOrphanDshProcesses(
+  outputChannel: vscode.OutputChannel,
+  excludedPid?: number,
+): Promise<void> {
+  for (const port of [3080, 3000]) {
+    await stopProcessOnPort(port, outputChannel, excludedPid)
+  }
+
+  if (process.platform === 'win32') {
+    execFile('taskkill.exe', ['/IM', 'dsh.exe', '/F'], () => {})
+  } else {
+    await new Promise<void>((resolveStop) => {
+      execFile('pgrep', ['-f', 'dsh.*--profile'], { encoding: 'utf8' }, async (_err, stdout) => {
+        if (stdout) {
+          const lines = stdout.split(/\r?\n/)
+          for (const line of lines) {
+            const pid = Number(line.trim())
+            if (Number.isInteger(pid) && pid > 0 && pid !== excludedPid && pid !== process.pid) {
+              outputChannel.appendLine(`[DeepSeek Harness] Stopping orphan DSH process ${pid}...`)
+              try {
+                process.kill(pid, 'SIGTERM')
+              } catch {
+                // Ignore
+              }
+            }
+          }
+        }
+        resolveStop()
+      })
+    })
+  }
+}
+
 /**
  * Enhanced PATH builder that includes common Node/pnpm install locations.
  */
@@ -670,7 +703,12 @@ export class DshProcessManager {
     return this.startProcess(command, args, projectPath)
   }
 
-  private async startProcess(command: string, args: string[], cwd: string): Promise<string> {
+  private async startProcess(
+    command: string,
+    args: string[],
+    cwd: string,
+    isRetry = false,
+  ): Promise<string> {
     if (this.currentInfo.status === 'running' && this.currentInfo.url) {
       return this.currentInfo.url
     }
@@ -795,7 +833,7 @@ export class DshProcessManager {
           }
         })
 
-        child.on('close', (code: number | null, signal: string | null) => {
+        child.on('close', async (code: number | null, signal: string | null) => {
           clearTimeout(startupTimer)
           this.outputChannel.appendLine(
             `[DeepSeek Harness] Process exited (code: ${code}, signal: ${signal})`,
@@ -807,6 +845,29 @@ export class DshProcessManager {
             this.setStatus('stopped', { url: undefined, port: undefined, pid: undefined })
           } else if (!isSettled) {
             isSettled = true
+
+            // When failing on first attempt with exit code 1, stop existing service/processes and retry start
+            if (!isRetry && code === 1) {
+              this.outputChannel.appendLine(
+                '[DeepSeek Harness] Process exited with code 1 on initial connect. Stopping existing service/processes and restarting chat...',
+              )
+              try {
+                await this.stop()
+                await new Promise((resolveWait) => setTimeout(resolveWait, 1000))
+                const retryUrl = await this.startProcess(command, args, cwd, true)
+                resolve(retryUrl)
+                return
+              } catch (retryErr: unknown) {
+                const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+                this.outputChannel.appendLine(
+                  `[DeepSeek Harness] Automatic restart after stop failed: ${retryMsg}`,
+                )
+                this.setStatus('error', { error: retryMsg, url: undefined, port: undefined, pid: undefined })
+                reject(new Error(retryMsg))
+                return
+              }
+            }
+
             const errMsg = `DeepSeek Harness exited with code ${code}`
             this.setStatus('error', { error: errMsg, url: undefined, port: undefined, pid: undefined })
             reject(new Error(errMsg))
@@ -847,7 +908,10 @@ export class DshProcessManager {
     this.backendPort = undefined
 
     if (!this.childProcess) {
-      await stopProcessOnPort(backendPort, this.outputChannel)
+      if (backendPort && backendPort > 0) {
+        await stopProcessOnPort(backendPort, this.outputChannel)
+      }
+      await stopOrphanDshProcesses(this.outputChannel)
       this.setStatus('stopped', { url: undefined, port: undefined, pid: undefined })
       return
     }
@@ -894,7 +958,11 @@ export class DshProcessManager {
       }
     })
 
-    await stopProcessOnPort(backendPort, this.outputChannel)
+    if (backendPort && backendPort > 0) {
+      await stopProcessOnPort(backendPort, this.outputChannel)
+    }
+    await stopOrphanDshProcesses(this.outputChannel, child.pid)
+    this.setStatus('stopped', { url: undefined, port: undefined, pid: undefined })
   }
 
   public async restart(): Promise<string> {

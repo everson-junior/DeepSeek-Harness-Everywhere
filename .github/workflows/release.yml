@@ -1,0 +1,76 @@
+name: Release & Publish VS Code Extension
+
+on:
+  release:
+    types: [published, created]
+  workflow_dispatch:
+    inputs:
+      publish_marketplace:
+        description: 'Publicar no Visual Studio Marketplace?'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build VSIX and Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: vscode/package-lock.json
+
+      - name: Install dependencies
+        working-directory: vscode
+        run: npm ci
+
+      - name: Build extension
+        working-directory: vscode
+        run: npm run build
+
+      - name: Package VSIX
+        working-directory: vscode
+        run: node scripts/package.mjs
+
+      - name: Upload VSIX as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: everywhere-vscode-vsix
+          path: vscode/*.vsix
+          retention-days: 30
+
+      - name: Attach VSIX to GitHub Release Assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: vscode/*.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Visual Studio Marketplace
+        if: ${{ env.VS_MARKETPLACE_TOKEN != '' && (github.event_name == 'release' || github.event.inputs.publish_marketplace == true) }}
+        working-directory: vscode
+        env:
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: |
+          echo "🚀 Publicando extensão no Visual Studio Marketplace..."
+          VSIX_FILE=$(ls *.vsix | head -n 1)
+          npx @vscode/vsce publish --packagePath "$VSIX_FILE" -p "$VS_MARKETPLACE_TOKEN" --no-dependencies --skip-license
+          echo "✅ Publicação concluída com sucesso!"
+
+      - name: Marketplace Notice (quando token não estiver configurado)
+        if: ${{ env.VS_MARKETPLACE_TOKEN == '' }}
+        env:
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: |
+          echo "::notice title=Marketplace Publish Skipped::O arquivo .vsix foi gerado e anexado aos artefatos da Release. Para habilitar a publicação automática no Visual Studio Marketplace, adicione o secret 'VS_MARKETPLACE_TOKEN' nas configurações do repositório (Settings -> Secrets and variables -> Actions)."

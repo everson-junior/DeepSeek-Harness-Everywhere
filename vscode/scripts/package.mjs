@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(__dirname, '..')
+const pkg = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'))
 
 function runExecutable(file, args, options) {
   if (process.platform === 'win32' && file.endsWith('.cmd')) {
@@ -22,7 +23,7 @@ execFileSync(process.execPath, [join(__dirname, 'build.mjs')], {
 })
 
 console.log('2. Packaging VSIX with @vscode/vsce...')
-const vsixName = 'deepseek-harness-vscode-0.1.0.vsix'
+const vsixName = `${pkg.name}-${pkg.version}.vsix`
 const vsixPath = join(appRoot, vsixName)
 
 runExecutable(
