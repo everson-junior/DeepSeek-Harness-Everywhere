@@ -27,6 +27,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectCapability Include="CreateVsixContainer" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="source.extension.vsixmanifest" />
     <None Include="LICENSE">
       <IncludeInVSIX>true</IncludeInVSIX>

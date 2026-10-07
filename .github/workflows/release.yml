@@ -145,6 +145,50 @@ jobs:
       - name: Build VSIX with MSBuild
         run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:minimal
 
+      - name: Diagnose build output
+        shell: pwsh
+        run: |
+          Write-Host "--- Build output files ---"
+          Get-ChildItem -Path visualstudio/Everywhere/bin -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host $_.FullName.Replace($PWD.Path, '.') }
+
+      - name: Package VSIX manually (fallback if MSBuild did not emit it)
+        shell: pwsh
+        run: |
+          if (Get-ChildItem -Path visualstudio -Filter *.vsix -Recurse -ErrorAction SilentlyContinue) {
+            Write-Host "VSIX already produced by MSBuild, skipping fallback."
+            exit 0
+          }
+          $ver = "${{ needs.get-version.outputs.version }}"
+          $out = Get-ChildItem -Path visualstudio/Everywhere/bin -Recurse -Filter Everywhere.dll | Select-Object -First 1
+          if (-not $out) { Write-Error "Everywhere.dll not found"; exit 1 }
+          $dir = $out.DirectoryName
+          $stage = Join-Path $PWD "vsix-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          # Ship project output, excluding VS SDK assemblies provided by the IDE
+          Get-ChildItem -Path $dir -File | Where-Object {
+            $_.Extension -notin '.pdb', '.xml' -and
+            $_.Name -notlike 'Microsoft.VisualStudio.*' -and
+            $_.Name -notlike 'Microsoft.VSSDK.*' -and
+            $_.Name -notlike 'StreamJsonRpc*' -and
+            $_.Name -notlike 'Microsoft.ServiceHub.*'
+          } | Copy-Item -Destination $stage
+          Get-ChildItem -Path $dir -Directory | Copy-Item -Destination $stage -Recurse
+          Copy-Item visualstudio/Everywhere/LICENSE $stage
+          New-Item -ItemType Directory -Force -Path "$stage/Resources" | Out-Null
+          Copy-Item visualstudio/Everywhere/Resources/*.png "$stage/Resources"
+          # Manifest: point the VsPackage asset at the generated pkgdef
+          $manifest = Get-Content visualstudio/Everywhere/source.extension.vsixmanifest -Raw
+          $manifest = [regex]::Replace($manifest, '<Asset Type="Microsoft.VisualStudio.VsPackage"[^>]*/>', '<Asset Type="Microsoft.VisualStudio.VsPackage" Path="Everywhere.pkgdef" />')
+          Set-Content -Path "$stage/extension.vsixmanifest" -Value $manifest -Encoding UTF8
+          $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="json" ContentType="application/octet-stream" /><Default Extension="config" ContentType="text/xml" /><Override PartName="/LICENSE" ContentType="text/plain" /></Types>'
+          Set-Content -Path "$stage/[Content_Types].xml" -Value $ct -Encoding UTF8
+          $dest = "visualstudio/Everywhere/bin/Release/Everywhere-$ver.vsix"
+          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+          Compress-Archive -Path "$stage/*" -DestinationPath "$dest.zip" -Force
+          Move-Item "$dest.zip" $dest -Force
+          Write-Host "Fallback VSIX created: $dest"
+
       - name: Locate generated VSIX
         shell: pwsh
         run: |
