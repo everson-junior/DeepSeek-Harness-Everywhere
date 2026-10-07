@@ -140,9 +140,10 @@ jobs:
           $ver = "${{ needs.get-version.outputs.version }}"
           $manifestPath = "visualstudio/Everywhere/source.extension.vsixmanifest"
           $content = Get-Content $manifestPath -Raw
-          $content = [regex]::Replace($content, 'Version="[0-9\.]+"', "Version=""$ver""")
+          # Atualiza APENAS o atributo Version da tag <Identity>, preservando PackageManifest Version="2.0.0"
+          $content = [regex]::Replace($content, '(<Identity\b[^>]*?\bVersion=")[^"]+(")', "`${1}$ver`${2}")
           Set-Content -Path $manifestPath -Value $content -NoNewline
-          Write-Host "Updated vsixmanifest to version $ver"
+          Write-Host "Updated Identity version in vsixmanifest to $ver"
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -151,7 +152,7 @@ jobs:
         run: dotnet restore visualstudio/Everywhere/Everywhere.csproj
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:minimal
+        run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Build,CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:minimal
 
       - name: Diagnose build output
         shell: pwsh
