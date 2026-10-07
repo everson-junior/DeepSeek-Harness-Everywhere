@@ -145,18 +145,29 @@ jobs:
       - name: Build VSIX with MSBuild
         run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:minimal
 
+      - name: Locate generated VSIX
+        shell: pwsh
+        run: |
+          $vsixFiles = Get-ChildItem -Path visualstudio -Filter *.vsix -Recurse
+          if ($vsixFiles.Count -eq 0) {
+            Write-Error "No VSIX file found in visualstudio folder!"
+            exit 1
+          }
+          $vsixFiles | ForEach-Object { Write-Host "Found VSIX: $($_.FullName) ($($_.Length) bytes)" }
+
       - name: Upload VS 2022 VSIX as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: everywhere-visualstudio-${{ needs.get-version.outputs.version }}-vsix
-          path: visualstudio/**/bin/Release/**/*.vsix
+          path: visualstudio/**/*.vsix
+          if-no-files-found: error
           retention-days: 30
 
       - name: Attach VS 2022 VSIX to GitHub Release Assets
         if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: visualstudio/**/bin/Release/**/*.vsix
+          files: visualstudio/**/*.vsix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
