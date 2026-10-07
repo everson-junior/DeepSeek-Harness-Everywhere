@@ -204,11 +204,12 @@ jobs:
 
           # Content Types ([Content_Types].xml) with UTF-8 BOM matching working reference
           $utf8WithBom = New-Object System.Text.UTF8Encoding($true)
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
           $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="json" ContentType="application/json" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="txt" ContentType="text/plain" /></Types>'
           [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8WithBom)
 
           # Calculate total uncompressed size and file list for VSIX v3 metadata
-          $allFiles = Get-ChildItem -Path $stage -Recurse -File
+          $allFiles = Get-ChildItem -Path $stage -Recurse -File | Where-Object { $_.Name -ne '[Content_Types].xml' }
           $totalSize = ($allFiles | Measure-Object -Property Length -Sum).Sum
           if ($totalSize -le 0) { $totalSize = 1048576 }
 
@@ -217,10 +218,8 @@ jobs:
             $rel = "/" + $f.FullName.Substring($stage.Length).TrimStart('\', '/').Replace('\', '/')
             $fileList += [ordered]@{ fileName = $rel; sha256 = $null }
           }
-          $fileList += [ordered]@{ fileName = "/manifest.json"; sha256 = $null }
-          $fileList += [ordered]@{ fileName = "/catalog.json"; sha256 = $null }
 
-          # manifest.json matching working reference schema
+          # manifest.json matching working reference schema (saved WITHOUT BOM)
           $manifestObj = [ordered]@{
             id = "Everywhere.DeepSeek.VSIX"
             version = $ver
@@ -236,9 +235,9 @@ jobs:
             }
           }
           $manifestJson = $manifestObj | ConvertTo-Json -Depth 5 -Compress
-          [System.IO.File]::WriteAllText((Join-Path $stage 'manifest.json'), $manifestJson, $utf8WithBom)
+          [System.IO.File]::WriteAllText((Join-Path $stage 'manifest.json'), $manifestJson, $utf8NoBom)
 
-          # catalog.json matching working reference schema
+          # catalog.json matching working reference schema (saved WITHOUT BOM)
           $catalogObj = [ordered]@{
             manifestVersion = "1.1"
             info = [ordered]@{
@@ -282,7 +281,7 @@ jobs:
             )
           }
           $catalogJson = $catalogObj | ConvertTo-Json -Depth 5 -Compress
-          [System.IO.File]::WriteAllText((Join-Path $stage 'catalog.json'), $catalogJson, $utf8WithBom)
+          [System.IO.File]::WriteAllText((Join-Path $stage 'catalog.json'), $catalogJson, $utf8NoBom)
 
           # Package into ZIP using forward-slash ZipArchive entries (Open Packaging Conventions compliant)
           $dest = "visualstudio/Everywhere/bin/Release/everywhere-visualstudio-$ver.vsix"
