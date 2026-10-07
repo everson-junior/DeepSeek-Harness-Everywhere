@@ -2,7 +2,7 @@ name: Build & Release Everywhere Extensions (VS Code, Visual Studio & IntelliJ)
 
 on:
   release:
-    types: [published, created]
+    types: [published]
   push:
     tags:
       - 'v*'
@@ -17,6 +17,11 @@ on:
         required: false
         type: boolean
         default: true
+
+# Um único run por ref: evita uploads simultâneos do mesmo asset na Release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
