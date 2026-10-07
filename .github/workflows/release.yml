@@ -152,7 +152,7 @@ jobs:
         run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Restore
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Build,CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
+        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
 
       - name: Diagnose build output
         shell: pwsh
@@ -214,7 +214,7 @@ jobs:
 
           $fileList = @()
           foreach ($f in $allFiles) {
-            $rel = "/" + $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
+            $rel = "/" + $f.FullName.Substring($stage.Length).TrimStart('\', '/').Replace('\', '/')
             $fileList += [ordered]@{ fileName = $rel; sha256 = $null }
           }
           $fileList += [ordered]@{ fileName = "/manifest.json"; sha256 = $null }
@@ -298,7 +298,7 @@ jobs:
           $archive = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
           try {
             Get-ChildItem -Path $stage -Recurse -File | ForEach-Object {
-              $rel = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+              $rel = $_.FullName.Substring($stage.Length).TrimStart('\', '/').Replace('\', '/')
               $entry = $archive.CreateEntry($rel, [System.IO.Compression.CompressionLevel]::Optimal)
               $entryStream = $entry.Open()
               try {
