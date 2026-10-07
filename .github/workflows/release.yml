@@ -201,66 +201,8 @@ jobs:
           # Manifest
           Copy-Item visualstudio/Everywhere/source.extension.vsixmanifest (Join-Path $stage 'extension.vsixmanifest')
 
-          # VSIX v3 metadata (manifest.json & catalog.json) matching reference VSIX schema
+          # Content Types ([Content_Types].xml)
           $utf8 = New-Object System.Text.UTF8Encoding($false)
-          $fileList = @()
-          Get-ChildItem -Path $stage -Recurse -File | ForEach-Object {
-            $rel = $_.FullName.Substring($stage.Length).Replace('\', '/')
-            $fileList += @{ fileName = $rel; sha256 = $null }
-          }
-
-          $manifestObj = @{
-            id = "Everywhere.DeepSeek.VSIX"
-            version = $ver
-            type = "Vsix"
-            vsixId = "Everywhere.DeepSeek.VSIX"
-            extensionDir = "[installdir]\Common7\IDE\Extensions\Everywhere"
-            files = $fileList
-          }
-          $manifestObj | ConvertTo-Json -Depth 5 -Compress | Set-Content (Join-Path $stage 'manifest.json') -Encoding utf8
-
-          $catalogObj = @{
-            manifestVersion = "1.1"
-            info = @{
-              id = "Everywhere.DeepSeek.VSIX,version=$ver"
-              manifestType = "Extension"
-            }
-            packages = @(
-              @{
-                id = "Component.Everywhere.DeepSeek.VSIX"
-                version = $ver
-                type = "Component"
-                extension = $true
-                dependencies = @{
-                  "Everywhere.DeepSeek.VSIX" = $ver
-                  "Microsoft.VisualStudio.Component.CoreEditor" = "17.0"
-                }
-                localizedResources = @(
-                  @{
-                    language = "en-US"
-                    title = "Everywhere - DeepSeek Harness for Visual Studio"
-                    description = "Run official DeepSeek Harness autonomous AI agents directly inside Visual Studio 2022."
-                  }
-                )
-              },
-              @{
-                id = "Everywhere.DeepSeek.VSIX"
-                version = $ver
-                type = "Vsix"
-                payloads = @(
-                  @{
-                    fileName = "everywhere-visualstudio-$ver.vsix"
-                    size = 0
-                  }
-                )
-                vsixId = "Everywhere.DeepSeek.VSIX"
-                extensionDir = "[installdir]\Common7\IDE\Extensions\Everywhere"
-              }
-            )
-          }
-          $catalogObj | ConvertTo-Json -Depth 5 -Compress | Set-Content (Join-Path $stage 'catalog.json') -Encoding utf8
-
-          # OPC Content Types ([Content_Types].xml) matching reference VSIX exactly (NO _rels folder)
           $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="json" ContentType="application/json" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="txt" ContentType="text/plain" /></Types>'
           [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8)
           $dest = "visualstudio/Everywhere/bin/Release/everywhere-visualstudio-$ver.vsix"

@@ -20,7 +20,7 @@
     <ExtensionInstallationRoot>CommonExtensions</ExtensionInstallationRoot>
     <ExtensionInstallationFolder>Everywhere</ExtensionInstallationFolder>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>latest</LangVersion> 
     <Nullable>enable</Nullable>
     <Authors>EverDock</Authors>
     <Company>EverDock</Company>
