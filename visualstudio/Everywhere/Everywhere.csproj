@@ -45,6 +45,9 @@
     <None Include="LICENSE">
       <IncludeInVSIX>true</IncludeInVSIX>
     </None>
+    <None Include="LICENSE.txt">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </None>
     <None Include="Resources\Icon.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </None>

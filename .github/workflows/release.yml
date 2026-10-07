@@ -194,6 +194,7 @@ jobs:
 
           Copy-Item visualstudio/Everywhere/Everywhere.pkgdef $stage
           Copy-Item visualstudio/Everywhere/LICENSE $stage
+          if (Test-Path visualstudio/Everywhere/LICENSE.txt) { Copy-Item visualstudio/Everywhere/LICENSE.txt $stage }
           New-Item -ItemType Directory -Force -Path "$stage/Resources" | Out-Null
           Copy-Item visualstudio/Everywhere/Resources/*.png "$stage/Resources"
 
