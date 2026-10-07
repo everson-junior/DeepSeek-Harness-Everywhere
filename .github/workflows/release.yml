@@ -180,13 +180,15 @@ jobs:
           # Manifest: point the VsPackage asset at the generated pkgdef
           $manifest = Get-Content visualstudio/Everywhere/source.extension.vsixmanifest -Raw
           $manifest = [regex]::Replace($manifest, '<Asset Type="Microsoft.VisualStudio.VsPackage"[^>]*/>', '<Asset Type="Microsoft.VisualStudio.VsPackage" Path="Everywhere.pkgdef" />')
-          Set-Content -Path "$stage/extension.vsixmanifest" -Value $manifest -Encoding UTF8
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText((Join-Path $stage 'extension.vsixmanifest'), $manifest, $utf8)
           $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="json" ContentType="application/octet-stream" /><Default Extension="config" ContentType="text/xml" /><Override PartName="/LICENSE" ContentType="text/plain" /></Types>'
-          Set-Content -Path "$stage/[Content_Types].xml" -Value $ct -Encoding UTF8
+          [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8)
           $dest = "visualstudio/Everywhere/bin/Release/Everywhere-$ver.vsix"
           New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-          Compress-Archive -Path "$stage/*" -DestinationPath "$dest.zip" -Force
-          Move-Item "$dest.zip" $dest -Force
+          if (Test-Path $dest) { Remove-Item $dest -Force }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, (Join-Path $PWD $dest))
           Write-Host "Fallback VSIX created: $dest"
 
       - name: Locate generated VSIX
