@@ -9,6 +9,7 @@ namespace Everywhere.Commands
     internal sealed class EverywhereCommands
     {
         public const int CommandId = 0x0100;
+        public const int ToolsCommandId = 0x0101;
         public static readonly Guid CommandSet = new Guid("9c193563-7182-4f76-92f7-e2c7c59c5d14");
 
         private readonly AsyncPackage _package;
@@ -21,6 +22,10 @@ namespace Everywhere.Commands
             var menuCommandID = new CommandID(CommandSet, CommandId);
             var menuItem = new MenuCommand(Execute, menuCommandID);
             commandService.AddCommand(menuItem);
+
+            var toolsCommandID = new CommandID(CommandSet, ToolsCommandId);
+            var toolsItem = new MenuCommand(Execute, toolsCommandID);
+            commandService.AddCommand(toolsItem);
         }
 
         public static async Task InitializeAsync(AsyncPackage package)

@@ -5,9 +5,22 @@
   <Extern href="vsshlids.h"/>
 
   <Commands package="guidEverywherePackage">
+    <Groups>
+      <Group guid="guidEverywherePackageCmdSet" id="EverywhereMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
+      </Group>
+    </Groups>
+
     <Buttons>
       <Button guid="guidEverywherePackageCmdSet" id="cmdidEverywhereToolWindowCommand" priority="0x0100" type="Button">
-        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTHRWNDWS1"/>
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1"/>
+        <Icon guid="guidImages" id="bmpPic1" />
+        <Strings>
+          <ButtonText>Everywhere (DeepSeek Harness)</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidEverywherePackageCmdSet" id="cmdidEverywhereToolsMenuCommand" priority="0x0100" type="Button">
+        <Parent guid="guidEverywherePackageCmdSet" id="EverywhereMenuGroup"/>
         <Icon guid="guidImages" id="bmpPic1" />
         <Strings>
           <ButtonText>Everywhere (DeepSeek Harness)</ButtonText>
@@ -24,7 +37,9 @@
     <GuidSymbol name="guidEverywherePackage" value="{a5323a67-932f-45b7-87dc-4db7eb0b1f20}" />
 
     <GuidSymbol name="guidEverywherePackageCmdSet" value="{9c193563-7182-4f76-92f7-e2c7c59c5d14}">
+      <IDSymbol name="EverywhereMenuGroup" value="0x1020" />
       <IDSymbol name="cmdidEverywhereToolWindowCommand" value="0x0100" />
+      <IDSymbol name="cmdidEverywhereToolsMenuCommand" value="0x0101" />
     </GuidSymbol>
 
     <GuidSymbol name="guidImages" value="{7e8346e9-dfc4-42f1-bbba-c3cf2c97a89e}" >

@@ -12,6 +12,8 @@ namespace Everywhere
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideToolWindow(typeof(ToolWindows.EverywhereToolWindow), Style = VsDockStyle.Tabbed, Window = "34E76E81-EE4A-11D0-AE2E-00A0C90FFFC3")]
     [ProvideOptionPage(typeof(Options.EverywhereOptionPage), "Everywhere", "General", 0, 0, true)]
+    [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideAutoLoad(UIContextGuids80.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class EverywherePackage : AsyncPackage
     {
         public const string PackageGuidString = "a5323a67-932f-45b7-87dc-4db7eb0b1f20";
