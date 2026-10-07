@@ -1,0 +1,25 @@
+[$RootKey$\Packages\{a5323a67-932f-45b7-87dc-4db7eb0b1f20}]
+@="Everywhere.EverywherePackage, Everywhere"
+"InprocServer32"="$PackageFolder$\Everywhere.dll"
+"Class"="Everywhere.EverywherePackage"
+"CodeBase"="$PackageFolder$\Everywhere.dll"
+"AllowsBackgroundLoading"=dword:00000001
+
+[$RootKey$\Menus]
+"{a5323a67-932f-45b7-87dc-4db7eb0b1f20}"=", Menus.ctmenu, 1"
+
+[$RootKey$\ToolWindows\{6e57dbf5-9614-4ebc-b356-91e813a893ef}]
+@="{a5323a67-932f-45b7-87dc-4db7eb0b1f20}"
+"Name"="Everywhere.ToolWindows.EverywhereToolWindow"
+"Package"="{a5323a67-932f-45b7-87dc-4db7eb0b1f20}"
+"Style"=dword:00000001
+"Window"="{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+
+[$RootKey$\ToolsOptionsPages\Everywhere]
+@="#0"
+"Package"="{a5323a67-932f-45b7-87dc-4db7eb0b1f20}"
+
+[$RootKey$\ToolsOptionsPages\Everywhere\General]
+@="#0"
+"Package"="{a5323a67-932f-45b7-87dc-4db7eb0b1f20}"
+"Page"="{470559a1-cb9b-4f92-933e-e673f47e24a7}"

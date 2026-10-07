@@ -152,7 +152,7 @@ jobs:
         run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Restore
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
+        run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Build /t:CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
 
       - name: Diagnose build output
         shell: pwsh
@@ -183,34 +183,47 @@ jobs:
             $_.Name -notlike 'Microsoft.ServiceHub.*'
           } | Copy-Item -Destination $stage
           Get-ChildItem -Path $dir -Directory | Copy-Item -Destination $stage -Recurse
+          Copy-Item visualstudio/Everywhere/Everywhere.pkgdef $stage
           Copy-Item visualstudio/Everywhere/LICENSE $stage
           New-Item -ItemType Directory -Force -Path "$stage/Resources" | Out-Null
           Copy-Item visualstudio/Everywhere/Resources/*.png "$stage/Resources"
 
-          # Generate Everywhere.pkgdef if not already in output
-          if (-not (Test-Path "$stage/Everywhere.pkgdef")) {
-            $pkgdefTool = Get-ChildItem -Path (Join-Path $env:USERPROFILE ".nuget/packages/microsoft.vssdk.buildtools") -Filter "CreatePkgDef.exe" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($pkgdefTool) {
-              Write-Host "Generating pkgdef with $($pkgdefTool.FullName)..."
-              & $pkgdefTool.FullName "$stage/Everywhere.dll" "$stage/Everywhere.pkgdef" "/codebase"
-            }
-          }
-
-          # Manifest: point the VsPackage asset at the generated pkgdef
-          $manifest = Get-Content visualstudio/Everywhere/source.extension.vsixmanifest -Raw
-          $manifest = [regex]::Replace($manifest, '<Asset Type="Microsoft.VisualStudio.VsPackage"[^>]*/>', '<Asset Type="Microsoft.VisualStudio.VsPackage" Path="Everywhere.pkgdef" />')
-          $utf8 = New-Object System.Text.UTF8Encoding($false)
-          [System.IO.File]::WriteAllText((Join-Path $stage 'extension.vsixmanifest'), $manifest, $utf8)
+          # Manifest
+          Copy-Item visualstudio/Everywhere/source.extension.vsixmanifest (Join-Path $stage 'extension.vsixmanifest')
 
           # VSIX v3 metadata (manifest.json & catalog.json)
-          $manifestJson = "{`"id`":`"Everywhere.DeepSeek.VSIX`",`"version`":`"$ver`",`"type`":`"Vsix`",`"vsixId`":`"Everywhere.DeepSeek.VSIX`"}"
-          [System.IO.File]::WriteAllText((Join-Path $stage 'manifest.json'), $manifestJson, $utf8)
-          $catalogJson = "{`"manifestVersion`":`"1.1`",`"info`":{`"id`":`"Everywhere.DeepSeek.VSIX`",`"version`":`"$ver`",`"type`":`"Vsix`"},`"packages`":[{`"id`":`"Component.Everywhere.DeepSeek.VSIX`",`"version`":`"$ver`",`"type`":`"Component`",`"dependencies`":{`"Microsoft.VisualStudio.Component.CoreEditor`":`"[17.0, 19.0)`"}}]}"
-          [System.IO.File]::WriteAllText((Join-Path $stage 'catalog.json'), $catalogJson, $utf8)
+          $manifestObj = @{
+            id = "Everywhere.DeepSeek.VSIX"
+            version = $ver
+            type = "Vsix"
+            vsixId = "Everywhere.DeepSeek.VSIX"
+          }
+          $manifestObj | ConvertTo-Json -Compress | Set-Content (Join-Path $stage 'manifest.json') -Encoding utf8
+
+          $catalogObj = @{
+            manifestVersion = "1.1"
+            info = @{
+              id = "Everywhere.DeepSeek.VSIX"
+              version = $ver
+              type = "Vsix"
+            }
+            packages = @(
+              @{
+                id = "Component.Everywhere.DeepSeek.VSIX"
+                version = $ver
+                type = "Component"
+                dependencies = @{
+                  "Microsoft.VisualStudio.Component.CoreEditor" = "[17.0, 19.0)"
+                }
+              }
+            )
+          }
+          $catalogObj | ConvertTo-Json -Compress -Depth 5 | Set-Content (Join-Path $stage 'catalog.json') -Encoding utf8
 
           # OPC package relationships (_rels/.rels)
           $relsDir = Join-Path $stage "_rels"
           New-Item -ItemType Directory -Force -Path $relsDir | Out-Null
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
           $rels = '<?xml version="1.0" encoding="utf-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.microsoft.com/developer/vsx-schema/2011" Target="/extension.vsixmanifest" Id="rId1" /></Relationships>'
           [System.IO.File]::WriteAllText((Join-Path $relsDir '.rels'), $rels, $utf8)
 

@@ -38,6 +38,10 @@
     <None Update="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
+    <None Include="Everywhere.pkgdef">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="LICENSE">
       <IncludeInVSIX>true</IncludeInVSIX>
     </None>
