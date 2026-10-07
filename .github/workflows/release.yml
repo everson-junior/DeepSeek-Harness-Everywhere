@@ -213,8 +213,19 @@ jobs:
                 version = $ver
                 type = "Component"
                 dependencies = @{
-                  "Microsoft.VisualStudio.Component.CoreEditor" = "[17.0, 19.0)"
+                  "Microsoft.VisualStudio.Component.CoreEditor" = "[17.0, 18.0)"
+                  "Everywhere.DeepSeek.VSIX" = "[$ver]"
                 }
+              },
+              @{
+                id = "Everywhere.DeepSeek.VSIX"
+                version = $ver
+                type = "Vsix"
+                payloads = @(
+                  @{
+                    fileName = "extension.vsixmanifest"
+                  }
+                )
               }
             )
           }
@@ -224,11 +235,11 @@ jobs:
           $relsDir = Join-Path $stage "_rels"
           New-Item -ItemType Directory -Force -Path $relsDir | Out-Null
           $utf8 = New-Object System.Text.UTF8Encoding($false)
-          $rels = '<?xml version="1.0" encoding="utf-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.microsoft.com/developer/vsx-schema/2011" Target="/extension.vsixmanifest" Id="rId1" /></Relationships>'
+          $rels = '<?xml version="1.0" encoding="utf-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.microsoft.com/developer/vsx-publishing/2010/manifest" Target="/extension.vsixmanifest" Id="rId1" /><Relationship Type="http://schemas.microsoft.com/developer/vsx-schema/2010" Target="/extension.vsixmanifest" Id="rId2" /><Relationship Type="http://schemas.microsoft.com/developer/vsx-schema/2011" Target="/extension.vsixmanifest" Id="rId3" /></Relationships>'
           [System.IO.File]::WriteAllText((Join-Path $relsDir '.rels'), $rels, $utf8)
 
           # OPC Content Types ([Content_Types].xml)
-          $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" /><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="png" ContentType="image/png" /><Default Extension="json" ContentType="application/json" /><Default Extension="config" ContentType="text/xml" /><Override PartName="/LICENSE" ContentType="text/plain" /></Types>'
+          $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" /><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="png" ContentType="image/png" /><Default Extension="json" ContentType="application/json" /><Default Extension="config" ContentType="text/xml" /><Override PartName="/LICENSE" ContentType="text/plain" /><Override PartName="/extension.vsixmanifest" ContentType="text/xml" /></Types>'
           [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8)
           $dest = "visualstudio/Everywhere/bin/Release/everywhere-visualstudio-$ver.vsix"
           New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
