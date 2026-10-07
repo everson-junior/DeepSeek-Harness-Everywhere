@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.deepseek.everywhere"
-version = "0.1.0"
+version = project.findProperty("pluginVersion") as String? ?: "0.1.0"
 
 repositories {
     mavenCentral()

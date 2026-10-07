@@ -3,8 +3,15 @@ name: Build & Release Everywhere Extensions (VS Code, Visual Studio & IntelliJ)
 on:
   release:
     types: [published, created]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Versão do release (ex: 0.1.0 - deixe em branco para usar a tag ou padrão)'
+        required: false
+        default: ''
       publish_marketplace:
         description: 'Publicar no Visual Studio Marketplace?'
         required: false
@@ -16,10 +23,34 @@ permissions:
 
 jobs:
   # -------------------------------------------------------------
+  # Resolve Release Version (from Tag or Input)
+  # -------------------------------------------------------------
+  get-version:
+    name: Resolve Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            RAW_VER="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref_name }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            RAW_VER="${{ github.ref_name }}"
+          else
+            RAW_VER="0.1.0"
+          fi
+          # Strip leading 'v' if present (e.g. v0.0.1 -> 0.0.1)
+          CLEAN_VER="${RAW_VER#v}"
+          echo "version=${CLEAN_VER}" >> $GITHUB_OUTPUT
+          echo "🏷️ Resolved version: ${CLEAN_VER}"
+
+  # -------------------------------------------------------------
   # 1. VS Code Extension (.vsix)
   # -------------------------------------------------------------
   build-vscode:
     name: Build VS Code VSIX
+    needs: get-version
     runs-on: ubuntu-latest
 
     steps:
@@ -32,6 +63,11 @@ jobs:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: vscode/package-lock.json
+
+      - name: Apply version from tag
+        working-directory: vscode
+        run: |
+          npm version ${{ needs.get-version.outputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
         working-directory: vscode
@@ -48,12 +84,12 @@ jobs:
       - name: Upload VSIX as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: everywhere-vscode-vsix
+          name: everywhere-vscode-${{ needs.get-version.outputs.version }}-vsix
           path: vscode/*.vsix
           retention-days: 30
 
       - name: Attach VSIX to GitHub Release Assets
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: vscode/*.vsix
@@ -83,35 +119,41 @@ jobs:
   # -------------------------------------------------------------
   build-visualstudio-2022:
     name: Build Visual Studio 2022 VSIX
+    needs: get-version
     runs-on: windows-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply version from tag
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.get-version.outputs.version }}"
+          $manifestPath = "visualstudio/Everywhere/source.extension.vsixmanifest"
+          $content = Get-Content $manifestPath -Raw
+          $content = [regex]::Replace($content, 'Version="[0-9\.]+"', "Version=""$ver""")
+          Set-Content -Path $manifestPath -Value $content -NoNewline
+          Write-Host "Updated vsixmanifest to version $ver"
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
       - name: Restore NuGet packages
-        run: |
-          dotnet restore visualstudio/Everywhere.sln
-          nuget restore visualstudio/Everywhere.sln
+        run: dotnet restore visualstudio/Everywhere/Everywhere.csproj
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere.sln -restore /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /v:m
+        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:minimal
 
       - name: Upload VS 2022 VSIX as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: everywhere-visualstudio-2022-vsix
+          name: everywhere-visualstudio-${{ needs.get-version.outputs.version }}-vsix
           path: visualstudio/**/bin/Release/**/*.vsix
           retention-days: 30
 
       - name: Attach VS 2022 VSIX to GitHub Release Assets
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: visualstudio/**/bin/Release/**/*.vsix
@@ -123,6 +165,7 @@ jobs:
   # -------------------------------------------------------------
   build-intellij:
     name: Build IntelliJ IDEA Plugin
+    needs: get-version
     runs-on: ubuntu-latest
 
     steps:
@@ -141,17 +184,17 @@ jobs:
 
       - name: Build Plugin with Gradle
         working-directory: intellij
-        run: ./gradlew buildPlugin --no-daemon
+        run: ./gradlew buildPlugin -PpluginVersion=${{ needs.get-version.outputs.version }} --no-daemon
 
       - name: Upload IntelliJ Plugin as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: everywhere-intellij-plugin
+          name: everywhere-intellij-${{ needs.get-version.outputs.version }}-plugin
           path: intellij/build/distributions/*.zip
           retention-days: 30
 
       - name: Attach IntelliJ Plugin to GitHub Release Assets
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: intellij/build/distributions/*.zip

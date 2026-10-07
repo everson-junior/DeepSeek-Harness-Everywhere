@@ -46,23 +46,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.507" />
-    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" />
-    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.0.5232" PrivateAssets="all" />
+    <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.527" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.11.435" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Design" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xaml" />
-    <Reference Include="System.Xml" />
-    <Reference Include="WindowsBase" />
   </ItemGroup>
 </Project>
