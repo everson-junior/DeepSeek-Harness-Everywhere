@@ -4,7 +4,7 @@
 
 # Everywhere 🌐⚡
 
-**DeepSeek Harness Everywhere — Conectando suas IDEs ao DeepSeek**
+**Everywhere DeepSeek Harness — Conectando suas IDEs ao DeepSeek**
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visualstudiocode)](./vscode)
 [![Visual Studio 2022](https://img.shields.io/badge/Visual%20Studio-2022%20(v17.0%2B)-purple?logo=visualstudio)](./visualstudio)
