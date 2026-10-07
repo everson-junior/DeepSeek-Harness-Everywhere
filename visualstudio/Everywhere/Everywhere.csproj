@@ -29,22 +29,28 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <VsSDKInstall Condition="'$(VsSDKInstall)' == ''">$(VSToolsPath)\VSSDK</VsSDKInstall>
+    <CustomAfterMicrosoftCSharpTargets Condition="'$(VsSDKInstall)' != ''">$(VsSDKInstall)\Microsoft.VsSDK.targets</CustomAfterMicrosoftCSharpTargets>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectCapability Include="CreateVsixContainer" />
     <ProjectCapability Include="Vsix" />
   </ItemGroup>
 
   <ItemGroup>
-    <VsixSourceManifest Include="source.extension.vsixmanifest">
+    <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
-    </VsixSourceManifest>
+    </None>
+    <None Include="Everywhere.pkgdef">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Everywhere.pkgdef">
-      <IncludeInVSIX>true</IncludeInVSIX>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="LICENSE.txt">
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -73,4 +79,6 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
   </ItemGroup>
+
+  <Import Project="$(VsSDKInstall)\Microsoft.VsSDK.targets" Condition="'$(CustomAfterMicrosoftCSharpTargets)' == '' and '$(VsSDKInstall)' != '' and Exists('$(VsSDKInstall)\Microsoft.VsSDK.targets')" />
 </Project>

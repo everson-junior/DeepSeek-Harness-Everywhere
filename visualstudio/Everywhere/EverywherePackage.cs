@@ -8,6 +8,7 @@ using Task = System.Threading.Tasks.Task;
 namespace Everywhere
 {
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
+    [InstalledProductRegistration("Everywhere - DeepSeek Harness for Visual Studio", "Run official DeepSeek Harness autonomous AI agents directly inside Visual Studio 2022.", "0.1.0")]
     [Guid(EverywherePackage.PackageGuidString)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideToolWindow(typeof(ToolWindows.EverywhereToolWindow), Style = VsDockStyle.Tabbed, Window = "34E76E81-EE4A-11D0-AE2E-00A0C90FFFC3")]

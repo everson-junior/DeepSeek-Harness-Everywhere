@@ -152,14 +152,25 @@ jobs:
         run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Restore
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
+        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:VisualStudioVersion=17.0 /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
 
-      - name: Diagnose build output
+      - name: Diagnose build output and verify CTO menu
         shell: pwsh
         run: |
           Write-Host "--- Build output files ---"
           Get-ChildItem -Path visualstudio/Everywhere/bin -Recurse -File -ErrorAction SilentlyContinue |
             ForEach-Object { Write-Host $_.FullName.Replace($PWD.Path, '.') }
+
+          $dll = Get-ChildItem -Path visualstudio/Everywhere/bin -Recurse -Filter Everywhere.dll | Select-Object -First 1
+          if ($dll) {
+            $bytes = [System.IO.File]::ReadAllBytes($dll.FullName)
+            $str = [System.Text.Encoding]::ASCII.GetString($bytes)
+            if ($str.Contains("CFCT")) {
+              Write-Host "VERIFIED: CFCT compiled menu command table is embedded in Everywhere.dll!"
+            } else {
+              Write-Warning "WARNING: CFCT not found in Everywhere.dll! MSBuild did not merge CTO into assembly."
+            }
+          }
 
       - name: Package VSIX manually (fallback if MSBuild did not emit it)
         shell: pwsh
@@ -194,7 +205,11 @@ jobs:
             Copy-Item -Path "$dir/runtimes" -Destination $stage -Recurse -Force
           }
 
-          Copy-Item visualstudio/Everywhere/Everywhere.pkgdef $stage
+          if (Test-Path "$dir/Everywhere.pkgdef") {
+            Copy-Item "$dir/Everywhere.pkgdef" $stage
+          } else {
+            Copy-Item visualstudio/Everywhere/Everywhere.pkgdef $stage
+          }
           Copy-Item visualstudio/Everywhere/LICENSE.txt $stage
           New-Item -ItemType Directory -Force -Path "$stage/Resources" | Out-Null
           Copy-Item visualstudio/Everywhere/Resources/*.png "$stage/Resources"

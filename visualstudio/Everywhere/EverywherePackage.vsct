@@ -14,23 +14,17 @@
     <Buttons>
       <Button guid="guidEverywherePackageCmdSet" id="cmdidEverywhereToolWindowCommand" priority="0x0100" type="Button">
         <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1"/>
-        <Icon guid="guidImages" id="bmpPic1" />
         <Strings>
           <ButtonText>Everywhere (DeepSeek Harness)</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidEverywherePackageCmdSet" id="cmdidEverywhereToolsMenuCommand" priority="0x0100" type="Button">
         <Parent guid="guidEverywherePackageCmdSet" id="EverywhereMenuGroup"/>
-        <Icon guid="guidImages" id="bmpPic1" />
         <Strings>
           <ButtonText>Everywhere (DeepSeek Harness)</ButtonText>
         </Strings>
       </Button>
     </Buttons>
-
-    <Bitmaps>
-      <Bitmap guid="guidImages" href="Resources\Icon.png" usedList="bmpPic1"/>
-    </Bitmaps>
   </Commands>
 
   <Symbols>
@@ -40,10 +34,6 @@
       <IDSymbol name="EverywhereMenuGroup" value="0x1020" />
       <IDSymbol name="cmdidEverywhereToolWindowCommand" value="0x0100" />
       <IDSymbol name="cmdidEverywhereToolsMenuCommand" value="0x0101" />
-    </GuidSymbol>
-
-    <GuidSymbol name="guidImages" value="{7e8346e9-dfc4-42f1-bbba-c3cf2c97a89e}" >
-      <IDSymbol name="bmpPic1" value="1" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
