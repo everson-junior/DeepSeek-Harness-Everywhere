@@ -14,6 +14,7 @@
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
     <CreateVsixContainer>true</CreateVsixContainer>
     <VSSDKBuildToolsAutoSetup>true</VSSDKBuildToolsAutoSetup>
+    <UseCodebase>true</UseCodebase>
     <DeployExtension Condition="'$(Configuration)' == 'Debug'">true</DeployExtension>
     <DeployExtension Condition="'$(Configuration)' != 'Debug'">false</DeployExtension>
     <ExtensionInstallationRoot>CommonExtensions</ExtensionInstallationRoot>
@@ -30,6 +31,7 @@
 
   <ItemGroup>
     <ProjectCapability Include="CreateVsixContainer" />
+    <ProjectCapability Include="Vsix" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,7 +57,10 @@
 
   <ItemGroup>
     <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.527" />
-    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.11.435" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.11.435">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
   </ItemGroup>
 </Project>
