@@ -1,6 +1,6 @@
 [$RootKey$\Packages\{a5323a67-932f-45b7-87dc-4db7eb0b1f20}]
 @="Everywhere.EverywherePackage, Everywhere"
-"InprocServer32"="$PackageFolder$\Everywhere.dll"
+"InprocServer32"="$WinDir$\SYSTEM32\MSCOREE.DLL"
 "Class"="Everywhere.EverywherePackage"
 "CodeBase"="$PackageFolder$\Everywhere.dll"
 "AllowsBackgroundLoading"=dword:00000001

@@ -174,15 +174,24 @@ jobs:
           $dir = $out.DirectoryName
           $stage = Join-Path $PWD "vsix-stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          # Ship project output, excluding VS SDK assemblies provided by the IDE
+          # Ship project output: ONLY extension assemblies and direct runtime dependencies
+          # (strictly exclude Visual Studio SDK/IDE assemblies, Microsoft.VisualStudio.*, VSLangProj*, StreamJsonRpc*, etc.)
           Get-ChildItem -Path $dir -File | Where-Object {
-            $_.Extension -notin '.pdb', '.xml' -and
+            $_.Extension -in '.dll' -and
             $_.Name -notlike 'Microsoft.VisualStudio.*' -and
             $_.Name -notlike 'Microsoft.VSSDK.*' -and
+            $_.Name -notlike 'Microsoft.ServiceHub.*' -and
+            $_.Name -notlike 'Microsoft.Build.*' -and
             $_.Name -notlike 'StreamJsonRpc*' -and
-            $_.Name -notlike 'Microsoft.ServiceHub.*'
+            $_.Name -notlike 'VSLangProj*' -and
+            $_.Name -notlike 'envdte*'
           } | Copy-Item -Destination $stage
-          Get-ChildItem -Path $dir -Directory | Copy-Item -Destination $stage -Recurse
+
+          # Copy WebView2 native runtimes if present (win-x64, win-arm64, win-x86)
+          if (Test-Path "$dir/runtimes") {
+            Copy-Item -Path "$dir/runtimes" -Destination $stage -Recurse -Force
+          }
+
           Copy-Item visualstudio/Everywhere/Everywhere.pkgdef $stage
           Copy-Item visualstudio/Everywhere/LICENSE $stage
           New-Item -ItemType Directory -Force -Path "$stage/Resources" | Out-Null
@@ -191,31 +200,47 @@ jobs:
           # Manifest
           Copy-Item visualstudio/Everywhere/source.extension.vsixmanifest (Join-Path $stage 'extension.vsixmanifest')
 
-          # VSIX v3 metadata (manifest.json & catalog.json)
+          # VSIX v3 metadata (manifest.json & catalog.json) matching reference VSIX schema
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          $fileList = @()
+          Get-ChildItem -Path $stage -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($stage.Length).Replace('\', '/')
+            $fileList += @{ fileName = $rel; sha256 = $null }
+          }
+
           $manifestObj = @{
             id = "Everywhere.DeepSeek.VSIX"
             version = $ver
             type = "Vsix"
             vsixId = "Everywhere.DeepSeek.VSIX"
+            extensionDir = "[installdir]\Common7\IDE\Extensions\Everywhere"
+            files = $fileList
           }
-          $manifestObj | ConvertTo-Json -Compress | Set-Content (Join-Path $stage 'manifest.json') -Encoding utf8
+          $manifestObj | ConvertTo-Json -Depth 5 -Compress | Set-Content (Join-Path $stage 'manifest.json') -Encoding utf8
 
           $catalogObj = @{
             manifestVersion = "1.1"
             info = @{
-              id = "Everywhere.DeepSeek.VSIX"
-              version = $ver
-              type = "Vsix"
+              id = "Everywhere.DeepSeek.VSIX,version=$ver"
+              manifestType = "Extension"
             }
             packages = @(
               @{
                 id = "Component.Everywhere.DeepSeek.VSIX"
                 version = $ver
                 type = "Component"
+                extension = $true
                 dependencies = @{
-                  "Microsoft.VisualStudio.Component.CoreEditor" = "[17.0, 18.0)"
-                  "Everywhere.DeepSeek.VSIX" = "[$ver]"
+                  "Everywhere.DeepSeek.VSIX" = $ver
+                  "Microsoft.VisualStudio.Component.CoreEditor" = "17.0"
                 }
+                localizedResources = @(
+                  @{
+                    language = "en-US"
+                    title = "Everywhere - DeepSeek Harness for Visual Studio"
+                    description = "Run official DeepSeek Harness autonomous AI agents directly inside Visual Studio 2022."
+                  }
+                )
               },
               @{
                 id = "Everywhere.DeepSeek.VSIX"
@@ -223,23 +248,19 @@ jobs:
                 type = "Vsix"
                 payloads = @(
                   @{
-                    fileName = "extension.vsixmanifest"
+                    fileName = "everywhere-visualstudio-$ver.vsix"
+                    size = 0
                   }
                 )
+                vsixId = "Everywhere.DeepSeek.VSIX"
+                extensionDir = "[installdir]\Common7\IDE\Extensions\Everywhere"
               }
             )
           }
-          $catalogObj | ConvertTo-Json -Compress -Depth 5 | Set-Content (Join-Path $stage 'catalog.json') -Encoding utf8
+          $catalogObj | ConvertTo-Json -Depth 5 -Compress | Set-Content (Join-Path $stage 'catalog.json') -Encoding utf8
 
-          # OPC package relationships (_rels/.rels)
-          $relsDir = Join-Path $stage "_rels"
-          New-Item -ItemType Directory -Force -Path $relsDir | Out-Null
-          $utf8 = New-Object System.Text.UTF8Encoding($false)
-          $rels = '<?xml version="1.0" encoding="utf-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.microsoft.com/developer/vsx-publishing/2010/manifest" Target="/extension.vsixmanifest" Id="rId1" /><Relationship Type="http://schemas.microsoft.com/developer/vsx-schema/2010" Target="/extension.vsixmanifest" Id="rId2" /><Relationship Type="http://schemas.microsoft.com/developer/vsx-schema/2011" Target="/extension.vsixmanifest" Id="rId3" /></Relationships>'
-          [System.IO.File]::WriteAllText((Join-Path $relsDir '.rels'), $rels, $utf8)
-
-          # OPC Content Types ([Content_Types].xml)
-          $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" /><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="png" ContentType="image/png" /><Default Extension="json" ContentType="application/json" /><Default Extension="config" ContentType="text/xml" /><Override PartName="/LICENSE" ContentType="text/plain" /><Override PartName="/extension.vsixmanifest" ContentType="text/xml" /></Types>'
+          # OPC Content Types ([Content_Types].xml) matching reference VSIX exactly (NO _rels folder)
+          $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="json" ContentType="application/json" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="txt" ContentType="text/plain" /></Types>'
           [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8)
           $dest = "visualstudio/Everywhere/bin/Release/everywhere-visualstudio-$ver.vsix"
           New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
