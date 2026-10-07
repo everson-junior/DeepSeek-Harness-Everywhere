@@ -8,6 +8,7 @@
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visualstudiocode)](./vscode)
 [![Visual Studio 2022](https://img.shields.io/badge/Visual%20Studio-2022%20(v17.0%2B)-purple?logo=visualstudio)](./visualstudio)
+[![IntelliJ IDEA](https://img.shields.io/badge/IntelliJ%20IDEA-2024.1%2B-red?logo=intellijidea)](./intellij)
 [![DeepSeek](https://img.shields.io/badge/AI-DeepSeek--V3%20%7C%20DeepSeek--R1-007acc)](https://deepseek.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-success)]()
@@ -18,6 +19,7 @@
 [Recursos](#-recursos-principais) •
 [Extensão VS Code](#-extensão-vs-code) •
 [Extensão Visual Studio 2022](#-extensão-visual-studio-2022) •
+[Extensão IntelliJ IDEA](#-extensão-intellij-idea) •
 [Instalação e Uso](#-instalação-e-uso) •
 [Configurações](#-configurações) •
 [Estrutura do Projeto](#-estrutura-do-projeto)
@@ -71,6 +73,19 @@ A extensão oficial para **Microsoft Visual Studio 2022** (IDE clássica x64) es
 - **Auto-Recuperação (Exit Code 1)**: Mata processos órfãos e portas presas e reconecta automaticamente.
 - **Menu Integrado**: Disponível em `View` ➔ `Other Windows` ➔ `Everywhere (DeepSeek Harness)`.
 - **Configuração no Visual Studio**: Opções em `Tools` ➔ `Options` ➔ `Everywhere`.
+
+---
+
+## ☕ Extensão IntelliJ IDEA
+
+A extensão oficial para **IntelliJ IDEA 2024.1+** (Community e Ultimate) está localizada no diretório [`/intellij`](./intellij).
+
+### Características
+- **Tool Window Nativa com JCEF (Java Chromium Embedded Framework)**: Renderização web nativa com Chromium acelerado por hardware diretamente na barra lateral direita.
+- **Project Binding Automático**: Roda contextualmente vinculado ao diretório do projeto aberto no IntelliJ (`project.basePath`).
+- **Auto-Recuperação (Exit Code 1)**: Mata processos órfãos e portas presas (3080/3000) e reconecta automaticamente.
+- **Toolbar de Controle Completo**: Iniciar (▶), Parar (🛑), Reiniciar (🔄), Recarregar (🔁), Abrir no Navegador (🌐) e Atalho para Configurações (⚙️).
+- **Configurações em Settings**: Integrado a `File` ➔ `Settings` ➔ `Tools` ➔ `Everywhere: DeepSeek Harness`.
 
 ---
 
@@ -155,6 +170,12 @@ everywhere/
 │   │   ├── Options/            # Página de configurações em Tools -> Options
 │   │   └── Resources/          # Ícone e Preview VSIX
 │   └── README.md               # Documentação da extensão Visual Studio 2022
+├── intellij/                   # Extensão para IntelliJ IDEA 2024.1+ (Kotlin / Gradle / JCEF)
+│   ├── build.gradle.kts        # Configuração do Gradle IntelliJ Platform Plugin
+│   ├── gradlew / gradlew.bat   # Scripts Gradle Wrapper
+│   ├── src/main/resources/     # plugin.xml e ícones da Tool Window e ações
+│   ├── src/main/kotlin/        # Serviços, ações, Tool Window com JCEF e configurações
+│   └── README.md               # Documentação da extensão IntelliJ IDEA
 ├── vscode/                     # Extensão para Visual Studio Code (TypeScript / Webview)
 │   ├── assets/
 │   │   └── icon/               # Ícone empacotado da extensão
@@ -175,17 +196,19 @@ everywhere/
 
 ---
 
-## 🚀 CI/CD & Publicação no Marketplace
+## 🚀 CI/CD & Geração de Artefatos no GitHub
 
-O repositório possui automação via **GitHub Actions** ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
+O repositório possui automação completa via **GitHub Actions** ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
 
-- **Ao publicar uma Release no GitHub**:
-  1. O bundle é compilado e o pacote `.vsix` é gerado automaticamente.
-  2. O arquivo `.vsix` é anexado diretamente como asset da Release no GitHub.
-  3. Se o secret `VS_MARKETPLACE_TOKEN` estiver configurado, a extensão é publicada automaticamente no **Visual Studio Marketplace**.
+- **Ao publicar uma Release no GitHub (ou executar manualmente via `workflow_dispatch`)**:
+  1. **VS Code**: Compila o código TypeScript com esbuild e empacota o instalador `.vsix`. Se configurado o secret `VS_MARKETPLACE_TOKEN`, publica no Visual Studio Code Marketplace.
+  2. **Visual Studio 2022**: Restaura pacotes via NuGet e compila o projeto C#/.NET com MSBuild no Windows, gerando o arquivo `Everywhere.vsix`.
+  3. **IntelliJ IDEA**: Configura o ambiente Java 17 e compila o plugin via Gradle (`./gradlew buildPlugin`), gerando o pacote `everywhere-intellij-0.1.0.zip`.
 
-> **Nota para configuração futura do Marketplace**:
-> Para ativar a publicação automática quando for lançar, basta criar um Personal Access Token (PAT) no [Visual Studio Marketplace Management Portal](https://marketplace.visualstudio.com/manage) e adicioná-lo em:  
+Todos os 3 artefatos ficam disponíveis tanto na aba **Actions** (como artefatos de workflow para download imediato) quanto anexados automaticamente aos **Assets da Release** no GitHub.
+
+> **Nota para publicação futura no VS Code Marketplace**:
+> Basta criar um Personal Access Token (PAT) no [Visual Studio Marketplace Management Portal](https://marketplace.visualstudio.com/manage) e adicioná-lo em:  
 > `GitHub Repository -> Settings -> Secrets and variables -> Actions -> New repository secret: VS_MARKETPLACE_TOKEN`.
 
 ---

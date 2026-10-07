@@ -1,4 +1,4 @@
-name: Release & Publish Extensions (VS Code & Visual Studio)
+name: Build & Release Everywhere Extensions (VS Code, Visual Studio & IntelliJ)
 
 on:
   release:
@@ -15,8 +15,11 @@ permissions:
   contents: write
 
 jobs:
-  build-and-publish:
-    name: Build VSIX and Publish
+  # -------------------------------------------------------------
+  # 1. VS Code Extension (.vsix)
+  # -------------------------------------------------------------
+  build-vscode:
+    name: Build VS Code VSIX
     runs-on: ubuntu-latest
 
     steps:
@@ -75,6 +78,9 @@ jobs:
         run: |
           echo "::notice title=Marketplace Publish Skipped::O arquivo .vsix foi gerado e anexado aos artefatos da Release. Para habilitar a publicação automática no Visual Studio Marketplace, adicione o secret 'VS_MARKETPLACE_TOKEN' nas configurações do repositório (Settings -> Secrets and variables -> Actions)."
 
+  # -------------------------------------------------------------
+  # 2. Visual Studio 2022 Extension (.vsix)
+  # -------------------------------------------------------------
   build-visualstudio-2022:
     name: Build Visual Studio 2022 VSIX
     runs-on: windows-latest
@@ -110,3 +116,42 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # -------------------------------------------------------------
+  # 3. IntelliJ IDEA Plugin (.zip)
+  # -------------------------------------------------------------
+  build-intellij:
+    name: Build IntelliJ IDEA Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x intellij/gradlew
+
+      - name: Build Plugin with Gradle
+        working-directory: intellij
+        run: ./gradlew buildPlugin --no-daemon
+
+      - name: Upload IntelliJ Plugin as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: everywhere-intellij-plugin
+          path: intellij/build/distributions/*.zip
+          retention-days: 30
+
+      - name: Attach IntelliJ Plugin to GitHub Release Assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: intellij/build/distributions/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

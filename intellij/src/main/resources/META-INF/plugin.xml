@@ -1,0 +1,67 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.deepseek.everywhere</id>
+    <name>Everywhere: DeepSeek Harness</name>
+    <vendor email="support@deepseek.com" url="https://github.com/everson-junior/DeepSeek-Harness-Everywhere">Everywhere Team</vendor>
+
+    <description><![CDATA[
+        <h2>Everywhere: DeepSeek Harness for IntelliJ IDEA</h2>
+        <p>Integrates the official <b>DeepSeek Harness (dsh)</b> autonomous AI agent runtime directly inside IntelliJ IDEA.</p>
+
+        <h3>Features:</h3>
+        <ul>
+            <li><b>Native Tool Window with JCEF</b>: Embedded hardware-accelerated web view displaying DeepSeek Harness.</li>
+            <li><b>Intelligent Workspace Binding</b>: Automatically runs with context bound to your currently opened IntelliJ project directory.</li>
+            <li><b>Auto-Recovery on Exit Code 1</b>: Automatically kills orphan processes and releases locked ports (3080/3000), reconnecting seamlessly.</li>
+            <li><b>Quick Action Toolbar</b>: Instant Start, Stop, Restart, Reload, External Browser, and Settings shortcuts.</li>
+            <li><b>Full Customization</b>: Custom executable paths, DeepSeek API Key, Base URL, ports, and execution profiles (<code>web</code>, <code>headless</code>, <code>tui</code>).</li>
+        </ul>
+    ]]></description>
+
+    <!-- Product and plugin compatibility requirements -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Everywhere"
+                    anchor="right"
+                    factoryClass="com.deepseek.everywhere.ui.EverywhereToolWindowFactory"
+                    icon="/icons/toolWindow.svg"/>
+
+        <applicationService serviceImplementation="com.deepseek.everywhere.settings.EverywhereSettingsState"/>
+        <projectService serviceImplementation="com.deepseek.everywhere.service.DshManagerService"/>
+
+        <applicationConfigurable parentId="tools"
+                                 instance="com.deepseek.everywhere.settings.EverywhereConfigurable"
+                                 id="com.deepseek.everywhere.settings.EverywhereConfigurable"
+                                 displayName="Everywhere: DeepSeek Harness"/>
+
+        <notificationGroup id="Everywhere Notification Group" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="Everywhere.ToolsMenu" text="Everywhere (DeepSeek Harness)" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Everywhere.Start"
+                    class="com.deepseek.everywhere.action.StartHarnessAction"
+                    text="Iniciar DeepSeek Harness"
+                    description="Inicia o runtime do DeepSeek Harness"/>
+            <action id="Everywhere.Stop"
+                    class="com.deepseek.everywhere.action.StopHarnessAction"
+                    text="Parar DeepSeek Harness"
+                    description="Interrompe o runtime do DeepSeek Harness"/>
+            <action id="Everywhere.Restart"
+                    class="com.deepseek.everywhere.action.RestartHarnessAction"
+                    text="Reiniciar DeepSeek Harness"
+                    description="Reinicia o runtime do DeepSeek Harness"/>
+            <separator/>
+            <action id="Everywhere.Browser"
+                    class="com.deepseek.everywhere.action.OpenInBrowserAction"
+                    text="Abrir no Navegador Externo"
+                    description="Abre a interface do DeepSeek Harness no navegador padrão"/>
+            <action id="Everywhere.Settings"
+                    class="com.deepseek.everywhere.action.OpenSettingsAction"
+                    text="Configurações do Everywhere"
+                    description="Abre as preferências do Everywhere"/>
+        </group>
+    </actions>
+</idea-plugin>
