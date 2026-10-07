@@ -84,7 +84,10 @@ jobs:
 
       - name: Package VSIX
         working-directory: vscode
-        run: node scripts/package.mjs
+        run: |
+          node scripts/package.mjs
+          # Nome único por IDE: evita colisão com o VSIX do Visual Studio na Release
+          mv everywhere-${{ needs.get-version.outputs.version }}.vsix everywhere-vscode-${{ needs.get-version.outputs.version }}.vsix
 
       - name: Upload VSIX as Workflow Artifact
         uses: actions/upload-artifact@v4
@@ -189,7 +192,7 @@ jobs:
           [System.IO.File]::WriteAllText((Join-Path $stage 'extension.vsixmanifest'), $manifest, $utf8)
           $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="json" ContentType="application/octet-stream" /><Default Extension="config" ContentType="text/xml" /><Override PartName="/LICENSE" ContentType="text/plain" /></Types>'
           [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8)
-          $dest = "visualstudio/Everywhere/bin/Release/Everywhere-$ver.vsix"
+          $dest = "visualstudio/Everywhere/bin/Release/everywhere-visualstudio-$ver.vsix"
           New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
           if (Test-Path $dest) { Remove-Item $dest -Force }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -204,7 +207,14 @@ jobs:
             Write-Error "No VSIX file found in visualstudio folder!"
             exit 1
           }
-          $vsixFiles | ForEach-Object { Write-Host "Found VSIX: $($_.FullName) ($($_.Length) bytes)" }
+          # Normaliza o nome (caso o MSBuild tenha gerado Everywhere.vsix)
+          $ver = "${{ needs.get-version.outputs.version }}"
+          foreach ($f in $vsixFiles) {
+            $target = "everywhere-visualstudio-$ver.vsix"
+            if ($f.Name -ne $target) { Rename-Item -LiteralPath $f.FullName -NewName $target -Force }
+          }
+          Get-ChildItem -Path visualstudio -Filter *.vsix -Recurse |
+            ForEach-Object { Write-Host "Found VSIX: $($_.FullName) ($($_.Length) bytes)" }
 
       - name: Upload VS 2022 VSIX as Workflow Artifact
         uses: actions/upload-artifact@v4
