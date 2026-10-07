@@ -152,7 +152,7 @@ jobs:
         run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Restore
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere/Everywhere.csproj /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
+        run: msbuild visualstudio/Everywhere/Everywhere.csproj /t:Build,CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /p:Version=${{ needs.get-version.outputs.version }} /p:VsixVersion=${{ needs.get-version.outputs.version }} /v:normal
 
       - name: Diagnose build output
         shell: pwsh
@@ -173,7 +173,9 @@ jobs:
           if (-not $out) { Write-Error "Everywhere.dll not found"; exit 1 }
           $dir = $out.DirectoryName
           $stage = Join-Path $PWD "vsix-stage"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
           # Ship project output: ONLY extension assemblies and direct runtime dependencies
           # (strictly exclude Visual Studio SDK/IDE assemblies, Microsoft.VisualStudio.*, VSLangProj*, StreamJsonRpc*, etc.)
           Get-ChildItem -Path $dir -File | Where-Object {
@@ -193,24 +195,128 @@ jobs:
           }
 
           Copy-Item visualstudio/Everywhere/Everywhere.pkgdef $stage
-          Copy-Item visualstudio/Everywhere/LICENSE $stage
-          if (Test-Path visualstudio/Everywhere/LICENSE.txt) { Copy-Item visualstudio/Everywhere/LICENSE.txt $stage }
+          Copy-Item visualstudio/Everywhere/LICENSE.txt $stage
           New-Item -ItemType Directory -Force -Path "$stage/Resources" | Out-Null
           Copy-Item visualstudio/Everywhere/Resources/*.png "$stage/Resources"
 
           # Manifest
           Copy-Item visualstudio/Everywhere/source.extension.vsixmanifest (Join-Path $stage 'extension.vsixmanifest')
 
-          # Content Types ([Content_Types].xml)
-          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          # Content Types ([Content_Types].xml) with UTF-8 BOM matching working reference
+          $utf8WithBom = New-Object System.Text.UTF8Encoding($true)
           $ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="vsixmanifest" ContentType="text/xml" /><Default Extension="json" ContentType="application/json" /><Default Extension="dll" ContentType="application/octet-stream" /><Default Extension="pkgdef" ContentType="text/plain" /><Default Extension="png" ContentType="application/octet-stream" /><Default Extension="txt" ContentType="text/plain" /></Types>'
-          [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8)
+          [System.IO.File]::WriteAllText((Join-Path $stage '[Content_Types].xml'), $ct, $utf8WithBom)
+
+          # Calculate total uncompressed size and file list for VSIX v3 metadata
+          $allFiles = Get-ChildItem -Path $stage -Recurse -File
+          $totalSize = ($allFiles | Measure-Object -Property Length -Sum).Sum
+          if ($totalSize -le 0) { $totalSize = 1048576 }
+
+          $fileList = @()
+          foreach ($f in $allFiles) {
+            $rel = "/" + $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
+            $fileList += [ordered]@{ fileName = $rel; sha256 = $null }
+          }
+          $fileList += [ordered]@{ fileName = "/manifest.json"; sha256 = $null }
+          $fileList += [ordered]@{ fileName = "/catalog.json"; sha256 = $null }
+
+          # manifest.json matching working reference schema
+          $manifestObj = [ordered]@{
+            id = "Everywhere.DeepSeek.VSIX"
+            version = $ver
+            type = "Vsix"
+            vsixId = "Everywhere.DeepSeek.VSIX"
+            extensionDir = "[installdir]\Common7\IDE\Extensions\Everywhere"
+            files = $fileList
+            installSizes = [ordered]@{
+              targetDrive = [int64]$totalSize
+            }
+            dependencies = [ordered]@{
+              "Microsoft.VisualStudio.Component.CoreEditor" = "17.0"
+            }
+          }
+          $manifestJson = $manifestObj | ConvertTo-Json -Depth 5 -Compress
+          [System.IO.File]::WriteAllText((Join-Path $stage 'manifest.json'), $manifestJson, $utf8WithBom)
+
+          # catalog.json matching working reference schema
+          $catalogObj = [ordered]@{
+            manifestVersion = "1.1"
+            info = [ordered]@{
+              id = "Everywhere.DeepSeek.VSIX,version=$ver"
+              manifestType = "Extension"
+            }
+            packages = @(
+              [ordered]@{
+                id = "Component.Everywhere.DeepSeek.VSIX"
+                version = $ver
+                type = "Component"
+                extension = $true
+                dependencies = [ordered]@{
+                  "Everywhere.DeepSeek.VSIX" = $ver
+                  "Microsoft.VisualStudio.Component.CoreEditor" = "17.0"
+                }
+                localizedResources = @(
+                  [ordered]@{
+                    language = "en-US"
+                    title = "Everywhere - DeepSeek Harness for Visual Studio"
+                    description = "Connect Visual Studio 2022 to the official DeepSeek Harness autonomous AI agent runtime."
+                  }
+                )
+              },
+              [ordered]@{
+                id = "Everywhere.DeepSeek.VSIX"
+                version = $ver
+                type = "Vsix"
+                payloads = @(
+                  [ordered]@{
+                    fileName = "everywhere-visualstudio-$ver.vsix"
+                    size = [int64]$totalSize
+                  }
+                )
+                vsixId = "Everywhere.DeepSeek.VSIX"
+                extensionDir = "[installdir]\Common7\IDE\Extensions\Everywhere"
+                installSizes = [ordered]@{
+                  targetDrive = [int64]$totalSize
+                }
+              }
+            )
+          }
+          $catalogJson = $catalogObj | ConvertTo-Json -Depth 5 -Compress
+          [System.IO.File]::WriteAllText((Join-Path $stage 'catalog.json'), $catalogJson, $utf8WithBom)
+
+          # Package into ZIP using forward-slash ZipArchive entries (Open Packaging Conventions compliant)
           $dest = "visualstudio/Everywhere/bin/Release/everywhere-visualstudio-$ver.vsix"
-          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-          if (Test-Path $dest) { Remove-Item $dest -Force }
+          $destDir = Split-Path (Join-Path $PWD $dest)
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+          $destPath = Join-Path $PWD $dest
+          if (Test-Path $destPath) { Remove-Item $destPath -Force }
+
+          Add-Type -AssemblyName System.IO.Compression
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, (Join-Path $PWD $dest))
-          Write-Host "Fallback VSIX created: $dest"
+
+          $zipStream = [System.IO.File]::Create($destPath)
+          $archive = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
+          try {
+            Get-ChildItem -Path $stage -Recurse -File | ForEach-Object {
+              $rel = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+              $entry = $archive.CreateEntry($rel, [System.IO.Compression.CompressionLevel]::Optimal)
+              $entryStream = $entry.Open()
+              try {
+                $fileStream = [System.IO.File]::OpenRead($_.FullName)
+                try {
+                  $fileStream.CopyTo($entryStream)
+                } finally {
+                  $fileStream.Dispose()
+                }
+              } finally {
+                $entryStream.Dispose()
+              }
+            }
+          } finally {
+            $archive.Dispose()
+            $zipStream.Dispose()
+          }
+          Write-Host "Fallback VSIX created: $dest ($((Get-Item $destPath).Length) bytes)"
 
       - name: Locate generated VSIX
         shell: pwsh

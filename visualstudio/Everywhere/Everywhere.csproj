@@ -35,25 +35,28 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="source.extension.vsixmanifest">
+    <VsixSourceManifest Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
-    </None>
-    <None Include="Everywhere.pkgdef">
+    </VsixSourceManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Everywhere.pkgdef">
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="LICENSE">
+    </Content>
+    <Content Include="LICENSE.txt">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
-    <None Include="LICENSE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Icon.png">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
-    <None Include="Resources\Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Preview.png">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
-    <None Include="Resources\Preview.png">
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
