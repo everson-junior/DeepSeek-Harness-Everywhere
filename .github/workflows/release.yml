@@ -96,23 +96,25 @@ jobs:
         uses: NuGet/setup-nuget@v2
 
       - name: Restore NuGet packages
-        run: nuget restore visualstudio/Everywhere.sln
+        run: |
+          dotnet restore visualstudio/Everywhere.sln
+          nuget restore visualstudio/Everywhere.sln
 
       - name: Build VSIX with MSBuild
-        run: msbuild visualstudio/Everywhere.sln /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true
+        run: msbuild visualstudio/Everywhere.sln -restore /p:Configuration=Release /p:DeployExtension=false /p:CreateVsixContainer=true /v:m
 
       - name: Upload VS 2022 VSIX as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: everywhere-visualstudio-2022-vsix
-          path: visualstudio/**/bin/Release/*.vsix
+          path: visualstudio/**/bin/Release/**/*.vsix
           retention-days: 30
 
       - name: Attach VS 2022 VSIX to GitHub Release Assets
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: visualstudio/**/bin/Release/*.vsix
+          files: visualstudio/**/bin/Release/**/*.vsix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

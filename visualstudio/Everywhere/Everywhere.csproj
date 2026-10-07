@@ -16,6 +16,7 @@
     <DeployExtension Condition="'$(Configuration)' == 'Debug'">true</DeployExtension>
     <ExtensionInstallationRoot>CommonExtensions</ExtensionInstallationRoot>
     <ExtensionInstallationFolder>Everywhere</ExtensionInstallationFolder>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Authors>EverDock</Authors>
@@ -27,6 +28,9 @@
 
   <ItemGroup>
     <None Include="source.extension.vsixmanifest" />
+    <None Include="LICENSE">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </None>
     <None Include="Resources\Icon.png">
       <IncludeInVSIX>true</IncludeInVSIX>
     </None>
