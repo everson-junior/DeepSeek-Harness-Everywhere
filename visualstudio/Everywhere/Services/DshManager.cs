@@ -115,7 +115,7 @@ namespace Everywhere.Services
 
             if (Status == HarnessStatus.Running && !string.IsNullOrEmpty(ActiveUrl))
             {
-                return ActiveUrl;
+                return ActiveUrl ?? string.Empty;
             }
 
             SetStatus(HarnessStatus.Starting);
@@ -124,7 +124,8 @@ namespace Everywhere.Services
             var options = EverywherePackage.Instance?.Options;
             var executable = FindDshExecutable(options?.CustomDshPath ?? "");
             var cwd = ResolveWorkspaceDirectory();
-            var portArg = (options?.Port ?? 0) > 0 ? $" --port {options.Port}" : "";
+            var port = options?.Port ?? 0;
+            var portArg = port > 0 ? $" --port {port}" : "";
             var profileArg = !string.IsNullOrWhiteSpace(options?.Profile) ? options.Profile : "web";
             var arguments = $"--profile {profileArg} --no-open{portArg}";
 
@@ -155,11 +156,11 @@ namespace Everywhere.Services
 
                 if (!string.IsNullOrWhiteSpace(options?.ApiKey))
                 {
-                    startInfo.EnvironmentVariables["DEEPSEEK_API_KEY"] = options.ApiKey;
+                    startInfo.EnvironmentVariables["DEEPSEEK_API_KEY"] = options.ApiKey!;
                 }
                 if (!string.IsNullOrWhiteSpace(options?.BaseUrl))
                 {
-                    startInfo.EnvironmentVariables["DEEPSEEK_BASE_URL"] = options.BaseUrl;
+                    startInfo.EnvironmentVariables["DEEPSEEK_BASE_URL"] = options.BaseUrl!;
                 }
 
                 _currentProcess = new Process { StartInfo = startInfo };

@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.Shell;
 namespace Everywhere.Options
 {
     [Guid("470559a1-cb9b-4f92-933e-e673f47e24a7")]
+    [ComVisible(true)]
     public class EverywhereOptionPage : DialogPage
     {
         [Category("DeepSeek Harness")]
