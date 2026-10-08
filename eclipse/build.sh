@@ -29,17 +29,18 @@ TARGET_JAR="$BUILD_DIR/$JAR_NAME"
 
 mkdir -p "$BIN_DIR" "$BUILD_DIR"
 
-# 1. Localizar compilador Java (JRE bundled no Eclipse ou JDK local/PATH)
+# 1. Localizar compilador Java (JRE bundled no Eclipse ou JDK no PATH)
 JAVAC=""
 JAR_BIN=""
 
-# Verifica primeiro no PATH (ex: setup-java no GitHub Actions ou JDK instalado)
-if command -v javac >/dev/null 2>&1 && command -v jar >/dev/null 2>&1; then
+# Tenta encontrar primeiro o compilador do próprio Eclipse (JustJ Java 25)
+JUSTJ_JAVAC=$(find /snap/eclipse -path "*/jre/bin/javac" 2>/dev/null | head -n 1 || true)
+if [ -n "$JUSTJ_JAVAC" ] && [ -x "$JUSTJ_JAVAC" ]; then
+    JAVAC="$JUSTJ_JAVAC"
+    JAR_BIN="$(dirname "$JAVAC")/jar"
+elif command -v javac >/dev/null 2>&1 && command -v jar >/dev/null 2>&1; then
     JAVAC="$(command -v javac)"
     JAR_BIN="$(command -v jar)"
-elif [ -f "/snap/eclipse/150/plugins/org.eclipse.justj.openjdk.hotspot.jre.full.linux.x86_64_25.0.4.v20260826-0822/jre/bin/javac" ]; then
-    JAVAC="/snap/eclipse/150/plugins/org.eclipse.justj.openjdk.hotspot.jre.full.linux.x86_64_25.0.4.v20260826-0822/jre/bin/javac"
-    JAR_BIN="/snap/eclipse/150/plugins/org.eclipse.justj.openjdk.hotspot.jre.full.linux.x86_64_25.0.4.v20260826-0822/jre/bin/jar"
 elif [ -f "/home/linux/.local/jdk-17/bin/javac" ]; then
     JAVAC="/home/linux/.local/jdk-17/bin/javac"
     JAR_BIN="/home/linux/.local/jdk-17/bin/jar"
