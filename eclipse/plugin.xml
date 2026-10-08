@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <!-- Views Extension -->
+   <extension point="org.eclipse.ui.views">
+      <category
+            id="com.deepseek.everywhere.category"
+            name="Everywhere">
+      </category>
+      <view
+            id="com.deepseek.everywhere.ui.EverywhereView"
+            name="Everywhere (DeepSeek Harness)"
+            icon="icons/deepseek_16.png"
+            category="com.deepseek.everywhere.category"
+            class="com.deepseek.everywhere.ui.EverywhereView"
+            inject="true">
+      </view>
+   </extension>
+
+   <!-- Commands Extension -->
+   <extension point="org.eclipse.ui.commands">
+      <category
+            id="com.deepseek.everywhere.commands.category"
+            name="Everywhere Commands">
+      </category>
+      <command
+            id="com.deepseek.everywhere.commands.openView"
+            name="Abrir Everywhere (DeepSeek Harness)"
+            categoryId="com.deepseek.everywhere.commands.category"
+            defaultHandler="com.deepseek.everywhere.handlers.OpenEverywhereViewHandler">
+      </command>
+      <command
+            id="com.deepseek.everywhere.commands.start"
+            name="Iniciar DeepSeek Harness"
+            categoryId="com.deepseek.everywhere.commands.category"
+            defaultHandler="com.deepseek.everywhere.handlers.StartHarnessHandler">
+      </command>
+      <command
+            id="com.deepseek.everywhere.commands.stop"
+            name="Parar DeepSeek Harness"
+            categoryId="com.deepseek.everywhere.commands.category"
+            defaultHandler="com.deepseek.everywhere.handlers.StopHarnessHandler">
+      </command>
+      <command
+            id="com.deepseek.everywhere.commands.restart"
+            name="Reiniciar DeepSeek Harness"
+            categoryId="com.deepseek.everywhere.commands.category"
+            defaultHandler="com.deepseek.everywhere.handlers.RestartHarnessHandler">
+      </command>
+   </extension>
+
+   <!-- Menus Extension -->
+   <extension point="org.eclipse.ui.menus">
+      <!-- Main Menu -->
+      <menuContribution locationURI="menu:org.eclipse.ui.main.menu?after=additions">
+         <menu
+               id="com.deepseek.everywhere.menu"
+               label="Everywhere"
+               icon="icons/deepseek_16.png">
+            <command
+                  commandId="com.deepseek.everywhere.commands.openView"
+                  icon="icons/deepseek_16.png"
+                  label="Abrir Painel Everywhere">
+            </command>
+            <separator name="lifecycle" visible="true">
+            </separator>
+            <command
+                  commandId="com.deepseek.everywhere.commands.start"
+                  icon="icons/start.png"
+                  label="Iniciar DeepSeek Harness">
+            </command>
+            <command
+                  commandId="com.deepseek.everywhere.commands.stop"
+                  icon="icons/stop.png"
+                  label="Parar DeepSeek Harness">
+            </command>
+            <command
+                  commandId="com.deepseek.everywhere.commands.restart"
+                  icon="icons/restart.png"
+                  label="Reiniciar DeepSeek Harness">
+            </command>
+         </menu>
+      </menuContribution>
+
+      <!-- Main Toolbar Icon -->
+      <menuContribution locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
+         <toolbar id="com.deepseek.everywhere.toolbar">
+            <command
+                  commandId="com.deepseek.everywhere.commands.openView"
+                  icon="icons/deepseek_16.png"
+                  tooltip="Abrir Everywhere (DeepSeek Harness)">
+            </command>
+         </toolbar>
+      </menuContribution>
+   </extension>
+
+   <!-- Preference Pages Extension -->
+   <extension point="org.eclipse.ui.preferencePages">
+      <page
+            id="com.deepseek.everywhere.preferences.page"
+            name="Everywhere (DeepSeek)"
+            class="com.deepseek.everywhere.preferences.EverywherePreferencePage">
+      </page>
+   </extension>
+
+   <!-- Preference Initializer -->
+   <extension point="org.eclipse.core.runtime.preferences">
+      <initializer
+            class="com.deepseek.everywhere.preferences.PreferenceInitializer">
+      </initializer>
+   </extension>
+
+</plugin>

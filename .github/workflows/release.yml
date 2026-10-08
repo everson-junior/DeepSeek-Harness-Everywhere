@@ -1,4 +1,4 @@
-name: Build & Release Everywhere Extensions (VS Code, Visual Studio & IntelliJ)
+name: Build & Release Everywhere Extensions (VS Code, Visual Studio, IntelliJ & Eclipse)
 
 on:
   release:
@@ -405,3 +405,46 @@ jobs:
           files: intellij/build/distributions/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # -------------------------------------------------------------
+  # 4. Eclipse IDE Plugin (.jar)
+  # -------------------------------------------------------------
+  build-eclipse:
+    name: Build Eclipse Plugin
+    needs: get-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Eclipse via Snap
+        run: sudo snap install --classic eclipse
+
+      - name: Build Eclipse Plugin
+        working-directory: eclipse
+        run: |
+          chmod +x build.sh
+          ./build.sh ${{ needs.get-version.outputs.version }}
+
+      - name: Upload Eclipse Plugin as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: everywhere-eclipse-${{ needs.get-version.outputs.version }}-plugin
+          path: eclipse/build/*.jar
+          retention-days: 30
+
+      - name: Attach Eclipse Plugin to GitHub Release Assets
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: eclipse/build/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

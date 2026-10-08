@@ -9,6 +9,7 @@
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visualstudiocode)](./vscode)
 [![Visual Studio 2022](https://img.shields.io/badge/Visual%20Studio-2022%20(v17.0%2B)-purple?logo=visualstudio)](./visualstudio)
 [![IntelliJ IDEA](https://img.shields.io/badge/IntelliJ%20IDEA-2024.1%2B-red?logo=intellijidea)](./intellij)
+[![Eclipse IDE](https://img.shields.io/badge/Eclipse%20IDE-2026--09%20(4.41.0)-2c2255?logo=eclipseide)](./eclipse)
 [![DeepSeek](https://img.shields.io/badge/AI-DeepSeek--V3%20%7C%20DeepSeek--R1-007acc)](https://deepseek.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-success)]()
@@ -20,6 +21,7 @@
 [Extensão VS Code](#-extensão-vs-code) •
 [Extensão Visual Studio 2022](#-extensão-visual-studio-2022) •
 [Extensão IntelliJ IDEA](#-extensão-intellij-idea) •
+[Extensão Eclipse IDE](#-extensão-eclipse-ide) •
 [Instalação e Uso](#-instalação-e-uso) •
 [Configurações](#-configurações) •
 [Estrutura do Projeto](#-estrutura-do-projeto)
@@ -86,6 +88,21 @@ A extensão oficial para **IntelliJ IDEA 2024.1+** (Community e Ultimate) está 
 - **Auto-Recuperação (Exit Code 1)**: Mata processos órfãos e portas presas (3080/3000) e reconecta automaticamente.
 - **Toolbar de Controle Completo**: Iniciar (▶), Parar (🛑), Reiniciar (🔄), Recarregar (🔁), Abrir no Navegador (🌐) e Atalho para Configurações (⚙️).
 - **Configurações em Settings**: Integrado a `File` ➔ `Settings` ➔ `Tools` ➔ `Everywhere: DeepSeek Harness`.
+
+---
+
+## 🌘 Extensão Eclipse IDE
+
+A extensão oficial para **Eclipse IDE** (validada para **Eclipse IDE for Java Developers 2026-09 / 4.41.0**) está localizada no diretório [`/eclipse`](./eclipse).
+
+### Características
+- **View Nativa com SWT Browser**: Renderização do DeepSeek Harness integrada em view nativa do Eclipse via WebKitGTK / Edge / WebKit.
+- **Workspace & Project Binding Automático**: Roda contextualmente vinculado ao projeto selecionado ou à raiz do Workspace (`IWorkspace` / `IProject`).
+- **Auto-Recuperação (Exit Code 1)**: Mata processos órfãos e portas presas (3080/3000) e reconecta automaticamente.
+- **Console Integrado**: Canal de saída em tempo real no console padrão do Eclipse (`Everywhere - DeepSeek Harness`).
+- **Toolbar de Controle Completo**: Iniciar (▶), Parar (🛑), Reiniciar (🔄), Recarregar (🔁), Abrir no Navegador (🌐) e Atalho para Configurações (⚙️).
+- **Preferências no Eclipse**: Integrado a `Window` ➔ `Preferences` ➔ `Everywhere (DeepSeek)`.
+- **Menu e Comandos**: Acesso rápido pelo menu superior `Everywhere` e ícone na barra de ferramentas.
 
 ---
 
@@ -176,6 +193,13 @@ everywhere/
 │   ├── src/main/resources/     # plugin.xml e ícones da Tool Window e ações
 │   ├── src/main/kotlin/        # Serviços, ações, Tool Window com JCEF e configurações
 │   └── README.md               # Documentação da extensão IntelliJ IDEA
+├── eclipse/                    # Extensão para Eclipse IDE 2026-09 (Java 17+ / OSGi / SWT Browser)
+│   ├── plugin.xml              # Registro de Views, Menus, Commands e Preferences
+│   ├── META-INF/MANIFEST.MF    # Manifesto OSGi com dependências do Eclipse
+│   ├── build.sh                # Script de compilação e auto-instalação
+│   ├── pom.xml                 # Configuração para Maven Tycho
+│   ├── src/com/deepseek/...    # View SWT, DshManager, Console, Ações e Preferências
+│   └── README.md               # Documentação da extensão Eclipse IDE
 ├── vscode/                     # Extensão para Visual Studio Code (TypeScript / Webview)
 │   ├── assets/
 │   │   └── icon/               # Ícone empacotado da extensão
@@ -204,8 +228,9 @@ O repositório possui automação completa via **GitHub Actions** ([`.github/wor
   1. **VS Code**: Compila o código TypeScript com esbuild e empacota o instalador `.vsix`. Se configurado o secret `VS_MARKETPLACE_TOKEN`, publica no Visual Studio Code Marketplace.
   2. **Visual Studio 2022**: Restaura pacotes via NuGet e compila o projeto C#/.NET com MSBuild no Windows, gerando o arquivo `Everywhere.vsix`.
   3. **IntelliJ IDEA**: Configura o ambiente Java 17 e compila o plugin via Gradle (`./gradlew buildPlugin`), gerando o pacote `everywhere-intellij-0.1.0.zip`.
+  4. **Eclipse IDE**: Configura o ambiente Java 17, compila o bundle OSGi PDE e empacota o plugin JAR (`everywhere-eclipse-0.1.0.jar`).
 
-Todos os 3 artefatos ficam disponíveis tanto na aba **Actions** (como artefatos de workflow para download imediato) quanto anexados automaticamente aos **Assets da Release** no GitHub.
+Todos os 4 artefatos ficam disponíveis tanto na aba **Actions** (como artefatos de workflow para download imediato) quanto anexados automaticamente aos **Assets da Release** no GitHub.
 
 > **Nota para publicação futura no VS Code Marketplace**:
 > Basta criar um Personal Access Token (PAT) no [Visual Studio Marketplace Management Portal](https://marketplace.visualstudio.com/manage) e adicioná-lo em:  

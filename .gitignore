@@ -3,3 +3,8 @@ dist/
 out/
 *.vsix
 .DS_Store
+
+# Eclipse build outputs
+eclipse/bin/
+eclipse/build/
+*.class
