@@ -1,11 +1,123 @@
 import { ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { createHash, createHmac } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import http, { Server, RequestOptions, IncomingMessage, ServerResponse, OutgoingHttpHeaders } from 'node:http'
 import { Duplex } from 'node:stream'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import * as vscode from 'vscode'
 import { ExtensionConfig, HarnessInfo, HarnessStatus } from './types.ts'
+
+interface SavedSession {
+  rawUrl: string
+  port: number
+  token?: string
+  updatedAt: number
+}
+
+function getSessionFilePath(storageRoot?: string): string {
+  if (storageRoot) {
+    try {
+      if (!existsSync(storageRoot)) {
+        mkdirSync(storageRoot, { recursive: true })
+      }
+      return join(storageRoot, 'last-session.json')
+    } catch {
+      // Fallback
+    }
+  }
+  const home = homedir()
+  const dshDir = join(home, '.dsh')
+  if (existsSync(dshDir)) {
+    return join(dshDir, 'last-session.json')
+  }
+  return join(home, '.dsh-last-session.json')
+}
+
+export function saveLastSession(
+  storageRoot: string | undefined,
+  session: { rawUrl: string; port: number; token?: string },
+): void {
+  try {
+    const file = getSessionFilePath(storageRoot)
+    const data: SavedSession = {
+      ...session,
+      updatedAt: Date.now(),
+    }
+    writeFileSync(file, JSON.stringify(data, null, 2), 'utf8')
+  } catch {
+    // Ignore session write errors
+  }
+}
+
+export function loadLastSession(storageRoot?: string): SavedSession | undefined {
+  try {
+    const file = getSessionFilePath(storageRoot)
+    if (!existsSync(file)) return undefined
+    const content = readFileSync(file, 'utf8')
+    return JSON.parse(content) as SavedSession
+  } catch {
+    return undefined
+  }
+}
+
+export function getDshSecret(): Buffer | undefined {
+  const credPath = join(homedir(), '.dsh', '.credentials.yaml')
+  if (!existsSync(credPath)) return undefined
+  try {
+    const content = readFileSync(credPath, 'utf8')
+    const match = content.match(/client-connection\/browser-session:[\s\S]*?secret:\s*([A-Za-z0-9_-]+)/)
+    if (!match) return undefined
+    const secretStr = match[1]
+    const padding = '='.repeat((4 - (secretStr.length % 4)) % 4)
+    return Buffer.from(secretStr.replaceAll('-', '+').replaceAll('_', '/') + padding, 'base64')
+  } catch {
+    return undefined
+  }
+}
+
+export function generateDshSessionCookie(authority: string, secret: Buffer): string {
+  const encodeBase64Url = (buf: Buffer | string) =>
+    Buffer.from(buf).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '')
+
+  const cookieName = 'dsh-auth-' + encodeBase64Url(createHash('sha256').update(authority).digest())
+  const now = Date.now()
+  const payload = {
+    version: 1,
+    authority,
+    issuedAt: now,
+    expiresAt: now + 30 * 24 * 3600 * 1000,
+  }
+  const body = encodeBase64Url(Buffer.from(JSON.stringify(payload), 'utf8'))
+  const sig = encodeBase64Url(createHmac('sha256', secret).update(body).digest())
+  const cookieValue = `v1.${body}.${sig}`
+  return `${cookieName}=${cookieValue}`
+}
+
+export async function checkDshPort(port: number): Promise<boolean> {
+  if (port <= 0) return false
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 1200)
+    const res = await fetch(`http://127.0.0.1:${port}/`, {
+      redirect: 'manual',
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    if (res.status === 401) {
+      const text = await res.text()
+      if (text.includes('dsh web authentication required') || text.toLowerCase().includes('dsh')) {
+        return true
+      }
+    }
+    if (res.status === 200 || res.status === 303) {
+      return true
+    }
+  } catch {
+    // Port closed or unresponsive
+  }
+  return false
+}
 
 function spawnExecutable(
   command: string,
@@ -557,10 +669,25 @@ export class DshProcessManager {
   }
 
   public async initStatus(): Promise<void> {
+    if (this.currentInfo.status === 'running') {
+      return
+    }
+
+    // Check if an existing DeepSeek Harness service is already running on the system
+    const existing = await this.findRunningDsh(this.config.port)
+    if (existing) {
+      try {
+        await this.attachToRunningService(existing)
+        return
+      } catch {
+        // Fall back to checking installation status
+      }
+    }
+
     const available = await this.isAvailable()
     if (!available) {
       this.setStatus('not_installed')
-    } else if (this.currentInfo.status === 'not_installed') {
+    } else if (this.currentInfo.status === 'not_installed' || this.currentInfo.status === 'starting') {
       this.setStatus('stopped')
     }
   }
@@ -585,6 +712,87 @@ export class DshProcessManager {
       ...extra,
     }
     this._onStatusChanged.fire(this.currentInfo)
+  }
+
+  /**
+   * Probes for an already running DeepSeek Harness backend on configured or standard ports.
+   */
+  public async findRunningDsh(targetPort?: number): Promise<{ port: number; pid?: number } | undefined> {
+    const candidatePorts = [targetPort ?? this.config.port, 3080, 3000].filter(
+      (p): p is number => typeof p === 'number' && p > 0,
+    )
+    const uniquePorts = Array.from(new Set(candidatePorts))
+
+    for (const port of uniquePorts) {
+      const isDsh = await checkDshPort(port)
+      if (isDsh) {
+        const pid = await findProcessIdOnPort(port)
+        return { port, pid }
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Attaches the VS Code Webview proxy to an already running DeepSeek Harness instance.
+   */
+  public async attachToRunningService(service: { port: number; pid?: number }): Promise<string> {
+    const dshPort = service.port
+    const saved = loadLastSession(this.storageRoot)
+
+    let initialCookie = ''
+    let rawDshUrl = `http://127.0.0.1:${dshPort}/`
+
+    // 1. Try using saved token if available for this port
+    if (saved && saved.port === dshPort && saved.token) {
+      try {
+        const authRes = await fetch(`http://127.0.0.1:${dshPort}/?token=${saved.token}`, {
+          redirect: 'manual',
+        })
+        const rawCookie = authRes.headers.get('set-cookie')
+        if (rawCookie) {
+          initialCookie = rawCookie.split(';')[0]
+          rawDshUrl = saved.rawUrl
+        }
+      } catch {
+        // Fall back to generated cookie
+      }
+    }
+
+    // 2. Fall back to cryptographically signed session cookie from ~/.dsh/.credentials.yaml
+    if (!initialCookie) {
+      const secret = getDshSecret()
+      if (secret) {
+        initialCookie = generateDshSessionCookie(`127.0.0.1:${dshPort}`, secret)
+      }
+    }
+
+    // 3. Fall back to saved URL if available
+    if (saved && saved.port === dshPort && saved.rawUrl) {
+      rawDshUrl = saved.rawUrl
+    }
+
+    // Close any previous proxy server
+    this.closeProxy()
+
+    try {
+      const { server, port: proxyPort } = await createIframeProxy(dshPort, initialCookie)
+      this.proxyServer = server
+
+      const webviewUrl = `http://127.0.0.1:${proxyPort}/`
+      this.backendPort = dshPort
+      this.setStatus('running', { url: webviewUrl, port: dshPort, pid: service.pid })
+      this.outputChannel.appendLine(`[DeepSeek Harness] Backend ready at: ${rawDshUrl}`)
+      this.outputChannel.appendLine(`[DeepSeek Harness] Webview sidebar ready at: ${webviewUrl}`)
+      return webviewUrl
+    } catch (proxyErr: unknown) {
+      const msg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr)
+      this.outputChannel.appendLine(`[DeepSeek Harness] Proxy start failed: ${msg}. Using raw URL.`)
+      this.backendPort = dshPort
+      this.setStatus('running', { url: rawDshUrl, port: dshPort, pid: service.pid })
+      this.outputChannel.appendLine(`[DeepSeek Harness] Backend ready at: ${rawDshUrl}`)
+      return rawDshUrl
+    }
   }
 
   /**
@@ -681,10 +889,23 @@ export class DshProcessManager {
    * Resolves when the authenticated web URL is ready to be embedded.
    */
   public async start(): Promise<string> {
+    if (this.currentInfo.status === 'running' && this.currentInfo.url) {
+      return this.currentInfo.url
+    }
+
     const available = await this.isAvailable()
     if (!available) {
       this.setStatus('not_installed')
       throw new Error('DeepSeek Harness is not installed. Please click "Instalar DeepSeek Harness" in the sidebar.')
+    }
+
+    // Check if an existing DeepSeek Harness service is already running
+    const existing = await this.findRunningDsh(this.config.port)
+    if (existing) {
+      this.outputChannel.appendLine(
+        `[DeepSeek Harness] Existing service detected on port ${existing.port}. Connecting to open instance...`,
+      )
+      return this.attachToRunningService(existing)
     }
 
     const workspaceFolders = vscode.workspace.workspaceFolders
@@ -807,6 +1028,7 @@ export class DshProcessManager {
               const webviewUrl = `http://127.0.0.1:${proxyPort}/`
               this.backendPort = dshPort
               this.setStatus('running', { url: webviewUrl, port: dshPort, pid: child.pid })
+              saveLastSession(this.storageRoot, { rawUrl: rawDshUrl, port: dshPort, token })
               this.outputChannel.appendLine(`[DeepSeek Harness] Backend ready at: ${rawDshUrl}`)
               this.outputChannel.appendLine(`[DeepSeek Harness] Webview sidebar ready at: ${webviewUrl}`)
               resolve(webviewUrl)
@@ -815,6 +1037,8 @@ export class DshProcessManager {
               this.outputChannel.appendLine(`[DeepSeek Harness] Proxy start failed: ${msg}. Using raw URL.`)
               this.backendPort = dshPort
               this.setStatus('running', { url: rawDshUrl, port: dshPort, pid: child.pid })
+              saveLastSession(this.storageRoot, { rawUrl: rawDshUrl, port: dshPort, token })
+              this.outputChannel.appendLine(`[DeepSeek Harness] Backend ready at: ${rawDshUrl}`)
               resolve(rawDshUrl)
             }
           }
@@ -846,25 +1070,43 @@ export class DshProcessManager {
           } else if (!isSettled) {
             isSettled = true
 
-            // When failing on first attempt with exit code 1, stop existing service/processes and retry start
-            if (!isRetry && code === 1) {
-              this.outputChannel.appendLine(
-                '[DeepSeek Harness] Process exited with code 1 on initial connect. Stopping existing service/processes and restarting chat...',
-              )
-              try {
-                await this.stop()
-                await new Promise((resolveWait) => setTimeout(resolveWait, 1000))
-                const retryUrl = await this.startProcess(command, args, cwd, true)
-                resolve(retryUrl)
-                return
-              } catch (retryErr: unknown) {
-                const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+            // When failing with exit code 1, check if DeepSeek Harness is already running
+            if (code === 1) {
+              const running = await this.findRunningDsh(this.config.port)
+              if (running) {
                 this.outputChannel.appendLine(
-                  `[DeepSeek Harness] Automatic restart after stop failed: ${retryMsg}`,
+                  `[DeepSeek Harness] Process exited with code 1 because DeepSeek Harness is already running on port ${running.port}. Connecting to existing instance...`,
                 )
-                this.setStatus('error', { error: retryMsg, url: undefined, port: undefined, pid: undefined })
-                reject(new Error(retryMsg))
-                return
+                try {
+                  const attachedUrl = await this.attachToRunningService(running)
+                  resolve(attachedUrl)
+                  return
+                } catch (attachErr: unknown) {
+                  this.outputChannel.appendLine(
+                    `[DeepSeek Harness] Failed to attach to running service: ${attachErr}`,
+                  )
+                }
+              }
+
+              if (!isRetry) {
+                this.outputChannel.appendLine(
+                  '[DeepSeek Harness] Process exited with code 1 on initial connect. Stopping existing service/processes and restarting chat...',
+                )
+                try {
+                  await this.stop()
+                  await new Promise((resolveWait) => setTimeout(resolveWait, 1000))
+                  const retryUrl = await this.startProcess(command, args, cwd, true)
+                  resolve(retryUrl)
+                  return
+                } catch (retryErr: unknown) {
+                  const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+                  this.outputChannel.appendLine(
+                    `[DeepSeek Harness] Automatic restart after stop failed: ${retryMsg}`,
+                  )
+                  this.setStatus('error', { error: retryMsg, url: undefined, port: undefined, pid: undefined })
+                  reject(new Error(retryMsg))
+                  return
+                }
               }
             }
 

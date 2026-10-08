@@ -25,7 +25,10 @@ namespace Everywhere.ToolWindows
             await InitWebView2Async();
 
             var autoStart = EverywherePackage.Instance?.Options?.AutoStart ?? true;
-            if (autoStart && DshManager.Instance.Status == HarnessStatus.Stopped)
+            var port = EverywherePackage.Instance?.Options?.Port ?? 0;
+            var runningExisting = await DshManager.FindRunningDshAsync(port > 0 ? port : 3080);
+
+            if (runningExisting != null || (autoStart && DshManager.Instance.Status == HarnessStatus.Stopped))
             {
                 await StartHarnessAsync();
             }

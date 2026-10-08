@@ -83,12 +83,18 @@ public class EverywhereView extends ViewPart implements HarnessStatusListener {
         DshManager.getInstance().addListener(this);
 
         IPreferenceStore store = Activator.getDefault().getPreferenceStore();
-        boolean autoStart = store.getBoolean(PreferenceConstants.P_AUTO_START);
-        if (autoStart && DshManager.getInstance().getStatus() == HarnessStatus.STOPPED) {
+        int targetPort = store.getInt(PreferenceConstants.P_PORT);
+        DshManager.RunningServiceInfo existing = DshManager.findRunningDsh(targetPort);
+        if (existing != null) {
             display.asyncExec(() -> DshManager.getInstance().start());
         } else {
-            stackLayout.topControl = overlayComposite;
-            mainContainer.layout();
+            boolean autoStart = store.getBoolean(PreferenceConstants.P_AUTO_START);
+            if (autoStart && DshManager.getInstance().getStatus() == HarnessStatus.STOPPED) {
+                display.asyncExec(() -> DshManager.getInstance().start());
+            } else {
+                stackLayout.topControl = overlayComposite;
+                mainContainer.layout();
+            }
         }
     }
 

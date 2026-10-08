@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -109,6 +111,107 @@ namespace Everywhere.Services
             return "dsh.cmd";
         }
 
+        public class RunningServiceInfo
+        {
+            public int Port { get; set; }
+            public string Url { get; set; } = string.Empty;
+        }
+
+        public static string GetSavedSessionFile()
+        {
+            var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(userHome, ".dsh", "last-session.json");
+        }
+
+        public static void SaveSession(string rawUrl, int port, string token)
+        {
+            try
+            {
+                var file = GetSavedSessionFile();
+                var dir = Path.GetDirectoryName(file);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                var escapedUrl = rawUrl.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var escapedToken = (token ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var epoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var json = $"{{\n  \"rawUrl\": \"{escapedUrl}\",\n  \"port\": {port},\n  \"token\": \"{escapedToken}\",\n  \"updatedAt\": {epoch}\n}}";
+                File.WriteAllText(file, json);
+            }
+            catch { }
+        }
+
+        public static string? LoadSavedUrl(int port)
+        {
+            try
+            {
+                var file = GetSavedSessionFile();
+                if (File.Exists(file))
+                {
+                    var content = File.ReadAllText(file);
+                    var portMatch = Regex.Match(content, @"""port""\s*:\s*(\d+)");
+                    var urlMatch = Regex.Match(content, @"""rawUrl""\s*:\s*""([^""]+)""");
+                    if (urlMatch.Success)
+                    {
+                        if (portMatch.Success && int.TryParse(portMatch.Groups[1].Value, out var savedPort))
+                        {
+                            if (savedPort == port) return urlMatch.Groups[1].Value;
+                        }
+                        else
+                        {
+                            return urlMatch.Groups[1].Value;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static async Task<bool> ProbeDshPortAsync(int port)
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(1500) };
+                var response = await client.GetAsync($"http://127.0.0.1:{port}/");
+                int code = (int)response.StatusCode;
+                if (code >= 200 && code < 400)
+                {
+                    return true;
+                }
+                if (code == 401)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    if (body != null && body.IndexOf("dsh web authentication required", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public static async Task<RunningServiceInfo?> FindRunningDshAsync(int targetPort)
+        {
+            var portsToTry = new List<int>();
+            if (targetPort > 0) portsToTry.Add(targetPort);
+            if (!portsToTry.Contains(3080)) portsToTry.Add(3080);
+            if (!portsToTry.Contains(3000)) portsToTry.Add(3000);
+
+            foreach (var p in portsToTry)
+            {
+                if (await ProbeDshPortAsync(p))
+                {
+                    var saved = LoadSavedUrl(p);
+                    var url = !string.IsNullOrEmpty(saved) ? saved! : $"http://127.0.0.1:{p}/";
+                    return new RunningServiceInfo { Port = p, Url = url };
+                }
+            }
+            return null;
+        }
+
         public async Task<string> StartAsync(bool isRetry = false)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -118,13 +221,24 @@ namespace Everywhere.Services
                 return ActiveUrl ?? string.Empty;
             }
 
+            var options = EverywherePackage.Instance?.Options;
+            var port = options?.Port ?? 0;
+            var checkPort = port > 0 ? port : 3080;
+
+            // Check if DSH is already running before spawning a new process
+            var existing = await FindRunningDshAsync(checkPort);
+            if (existing != null)
+            {
+                Log($"[DeepSeek Harness] Backend ready at:\n{existing.Url}");
+                SetStatus(HarnessStatus.Running, existing.Url, existing.Port);
+                return existing.Url;
+            }
+
             SetStatus(HarnessStatus.Starting);
             Log("Starting DeepSeek Harness runtime...");
 
-            var options = EverywherePackage.Instance?.Options;
             var executable = FindDshExecutable(options?.CustomDshPath ?? "");
             var cwd = ResolveWorkspaceDirectory();
-            var port = options?.Port ?? 0;
             var portArg = port > 0 ? $" --port {port}" : "";
             var profileArg = !string.IsNullOrWhiteSpace(options?.Profile) ? options.Profile : "web";
             var arguments = $"--profile {profileArg} --no-open{portArg}";
@@ -138,6 +252,27 @@ namespace Everywhere.Services
                 {
                     SetStatus(HarnessStatus.Error, error: "Timeout waiting for DeepSeek Harness to start.");
                     tcs.TrySetException(new TimeoutException("Timeout waiting for DeepSeek Harness to start."));
+                }
+            });
+
+            // Concurrently poll for active server
+            _ = Task.Run(async () =>
+            {
+                for (int i = 0; i < 40; i++)
+                {
+                    if (tcs.Task.IsCompleted) return;
+                    await Task.Delay(500);
+                    if (tcs.Task.IsCompleted) return;
+
+                    var runInfo = await FindRunningDshAsync(checkPort);
+                    if (runInfo != null && !tcs.Task.IsCompleted)
+                    {
+                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                        Log($"[DeepSeek Harness] Backend ready at:\n{runInfo.Url}");
+                        SetStatus(HarnessStatus.Running, runInfo.Url, runInfo.Port);
+                        tcs.TrySetResult(runInfo.Url);
+                        return;
+                    }
                 }
             });
 
@@ -173,19 +308,27 @@ namespace Everywhere.Services
                     Log(e.Data);
 
                     var match = urlRegex.Match(e.Data);
-                    if (match.Success && !tcs.Task.IsCompleted)
+                    if (match.Success)
                     {
                         var url = match.Groups[1].Value;
-                        int port = 3080;
+                        int detectedPort = 3080;
                         try
                         {
                             var uri = new Uri(url);
-                            port = uri.Port;
+                            detectedPort = uri.Port;
+                            var tokenMatch = Regex.Match(url, @"[?&]token=([^&#]+)");
+                            var token = tokenMatch.Success ? tokenMatch.Groups[1].Value : "";
+                            SaveSession(url, detectedPort, token);
                         }
                         catch { }
 
-                        SetStatus(HarnessStatus.Running, url, port);
-                        tcs.TrySetResult(url);
+                        Log($"[DeepSeek Harness] Backend ready at:\n{url}");
+
+                        if (!tcs.Task.IsCompleted)
+                        {
+                            SetStatus(HarnessStatus.Running, url, detectedPort);
+                            tcs.TrySetResult(url);
+                        }
                     }
                 };
 
@@ -205,7 +348,17 @@ namespace Everywhere.Services
 
                     if (!tcs.Task.IsCompleted)
                     {
-                        // Auto-retry on Exit Code 1
+                        // Check if an existing service was already running on this port
+                        var runningExisting = await FindRunningDshAsync(checkPort);
+                        if (runningExisting != null)
+                        {
+                            Log($"[DeepSeek Harness] Backend ready at:\n{runningExisting.Url}");
+                            SetStatus(HarnessStatus.Running, runningExisting.Url, runningExisting.Port);
+                            tcs.TrySetResult(runningExisting.Url);
+                            return;
+                        }
+
+                        // Auto-retry on Exit Code 1 only if NOT already running
                         if (!isRetry && exitCode == 1)
                         {
                             Log("Startup failed with exit code 1. Stopping orphan services and retrying start...");

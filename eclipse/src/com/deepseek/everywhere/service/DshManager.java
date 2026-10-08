@@ -11,6 +11,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -225,6 +227,96 @@ public class DshManager {
         }
     }
 
+    public static class RunningServiceInfo {
+        public final int port;
+        public final String url;
+
+        public RunningServiceInfo(int port, String url) {
+            this.port = port;
+            this.url = url;
+        }
+    }
+
+    private static String getSavedSessionFile() {
+        String userHome = System.getProperty("user.home", "");
+        return userHome + File.separator + ".dsh" + File.separator + "last-session.json";
+    }
+
+    private static void saveSession(String rawUrl, int port, String token) {
+        try {
+            File file = new File(getSavedSessionFile());
+            if (file.getParentFile() != null) {
+                file.getParentFile().mkdirs();
+            }
+            String json = "{\n  \"rawUrl\": \"" + rawUrl + "\",\n  \"port\": " + port + ",\n  \"token\": \"" + (token != null ? token : "") + "\",\n  \"updatedAt\": " + System.currentTimeMillis() + "\n}";
+            Files.write(file.toPath(), json.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ignored) {}
+    }
+
+    private static String loadSavedUrl(int port) {
+        try {
+            File file = new File(getSavedSessionFile());
+            if (!file.exists()) return null;
+            String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            Matcher mPort = Pattern.compile("\"port\"\\s*:\\s*" + port).matcher(content);
+            if (mPort.find()) {
+                Matcher mUrl = Pattern.compile("\"rawUrl\"\\s*:\\s*\"([^\"]+)\"").matcher(content);
+                if (mUrl.find()) {
+                    return mUrl.group(1).trim();
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    public static boolean probeDshPort(int port) {
+        if (port <= 0) return false;
+        try {
+            URL u = new URL("http://127.0.0.1:" + port + "/");
+            HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+            conn.setConnectTimeout(800);
+            conn.setReadTimeout(800);
+            conn.setInstanceFollowRedirects(false);
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 400) {
+                return true;
+            }
+            if (code == 401) {
+                java.io.InputStream stream = conn.getErrorStream() != null ? conn.getErrorStream() : conn.getInputStream();
+                if (stream != null) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line).append("\n");
+                        }
+                        String body = sb.toString();
+                        if (body.contains("dsh web authentication required") || body.toLowerCase().contains("dsh")) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    public static RunningServiceInfo findRunningDsh(int targetPort) {
+        List<Integer> candidatePorts = new ArrayList<>();
+        if (targetPort > 0) candidatePorts.add(targetPort);
+        if (!candidatePorts.contains(3080)) candidatePorts.add(3080);
+        if (!candidatePorts.contains(3000)) candidatePorts.add(3000);
+
+        for (int p : candidatePorts) {
+            if (probeDshPort(p)) {
+                String saved = loadSavedUrl(p);
+                String url = (saved != null && !saved.isEmpty()) ? saved : ("http://127.0.0.1:" + p + "/");
+                return new RunningServiceInfo(p, url);
+            }
+        }
+        return null;
+    }
+
     private String extractUrlFromLine(String text) {
         Matcher m1 = URL_DSH_REGEX.matcher(text);
         if (m1.find()) {
@@ -259,6 +351,18 @@ public class DshManager {
         final int targetPort = store.getInt(PreferenceConstants.P_PORT);
         final String apiKey = store.getString(PreferenceConstants.P_API_KEY);
         final String baseUrl = store.getString(PreferenceConstants.P_BASE_URL);
+
+        // Verificar se serviço já está em execução antes de iniciar novo processo
+        RunningServiceInfo existing = findRunningDsh(targetPort);
+        if (existing != null) {
+            EverywhereConsole.log("[DeepSeek Harness] Serviço já em execução detectado na porta " + existing.port + ". Utilizando instância aberta...");
+            EverywhereConsole.log("[DeepSeek Harness] Backend ready at: " + existing.url);
+            setStatus(HarnessStatus.RUNNING, existing.url, existing.port, null);
+            return;
+        }
+
+        setStatus(HarnessStatus.STARTING, null, null, null);
+        EverywhereConsole.log("Iniciando DeepSeek Harness runtime (tentativa " + (isRetry ? "2/recuperação" : "1") + ")...");
 
         final List<String> cmdList = new ArrayList<>();
         boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
@@ -341,12 +445,23 @@ public class DshManager {
                                 String detected = extractUrlFromLine(line);
                                 if (detected != null && urlFound.compareAndSet(false, true)) {
                                     int detectedPort = 3080;
+                                    String token = "";
                                     try {
                                         URI uri = new URI(detected);
                                         if (uri.getPort() > 0) detectedPort = uri.getPort();
+                                        String query = uri.getQuery();
+                                        if (query != null) {
+                                            for (String param : query.split("&")) {
+                                                String[] pair = param.split("=");
+                                                if (pair.length == 2 && "token".equals(pair[0])) {
+                                                    token = pair[1];
+                                                }
+                                            }
+                                        }
                                     } catch (Exception ignored) {}
 
-                                    EverywhereConsole.log("URL do DeepSeek Harness detectada: " + detected);
+                                    saveSession(detected, detectedPort, token);
+                                    EverywhereConsole.log("[DeepSeek Harness] Backend ready at: " + detected);
                                     setStatus(HarnessStatus.RUNNING, detected, detectedPort, null);
                                 }
                             }
@@ -391,10 +506,12 @@ public class DshManager {
                                 conn.setReadTimeout(500);
                                 conn.setInstanceFollowRedirects(false);
                                 int code = conn.getResponseCode();
-                                if (code >= 200 && code < 400) {
+                                if ((code >= 200 && code < 400) || (code == 401 && probeDshPort(p))) {
                                     if (urlFound.compareAndSet(false, true)) {
-                                        String healthUrl = "http://127.0.0.1:" + p + "/";
+                                        String saved = loadSavedUrl(p);
+                                        String healthUrl = (saved != null && !saved.isEmpty()) ? saved : ("http://127.0.0.1:" + p + "/");
                                         EverywhereConsole.log("Health check ativo detectou serviço respondendo na porta " + p + " (HTTP " + code + ")");
+                                        EverywhereConsole.log("[DeepSeek Harness] Backend ready at: " + healthUrl);
                                         setStatus(HarnessStatus.RUNNING, healthUrl, p, null);
                                         break;
                                     }
@@ -424,14 +541,24 @@ public class DshManager {
                 EverywhereConsole.log("Processo DeepSeek Harness finalizado com código " + exitCode + ".");
 
                 if (!urlFound.get()) {
-                    if (!isRetry && exitCode == 1) {
-                        EverywhereConsole.log("Falha com código 1 (porta possivelmente ocupada). Limpando serviços órfãos e tentando reiniciar...");
-                        stop(true);
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ignored) {}
-                        start(true);
-                        return;
+                    if (exitCode == 1) {
+                        RunningServiceInfo running = findRunningDsh(targetPort);
+                        if (running != null) {
+                            EverywhereConsole.log("[DeepSeek Harness] Processo encerrou com código 1 pois DeepSeek Harness já está em execução na porta " + running.port + ". Utilizando instância aberta...");
+                            EverywhereConsole.log("[DeepSeek Harness] Backend ready at: " + running.url);
+                            setStatus(HarnessStatus.RUNNING, running.url, running.port, null);
+                            return;
+                        }
+
+                        if (!isRetry) {
+                            EverywhereConsole.log("Falha com código 1 (porta possivelmente ocupada). Limpando serviços órfãos e tentando reiniciar...");
+                            stop(true);
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException ignored) {}
+                            start(true);
+                            return;
+                        }
                     }
 
                     String errMsg = "DeepSeek Harness encerrou prematuramente com código " + exitCode + ".";

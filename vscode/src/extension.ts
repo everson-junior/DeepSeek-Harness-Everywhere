@@ -158,6 +158,12 @@ export function activate(context: vscode.ExtensionContext): void {
         const msg = err instanceof Error ? err.message : String(err)
         if (msg.includes('exited with code 1')) {
           try {
+            const existing = await dshManager.findRunningDsh()
+            if (existing) {
+              await dshManager.attachToRunningService(existing)
+              await vscode.commands.executeCommand('deepseek.harnessView.focus')
+              return
+            }
             outputChannel.appendLine('[DeepSeek Harness] Handling exit code 1 fallback: stopping service and retrying...')
             await dshManager.stop()
             await new Promise((r) => setTimeout(r, 1000))

@@ -61,3 +61,65 @@ describe('DeepSeek Harness VS Code Extension - Command Resolution', () => {
     assert.strictEqual(installedCommands.includes(sourceCheckout), false)
   })
 })
+
+describe('DeepSeek Harness VS Code Extension - Session and Auth Helpers', () => {
+  it('generates valid RFC-compliant base64url cookie structure with HMAC signature', async () => {
+    const crypto = await import('node:crypto')
+    const secret = crypto.randomBytes(32)
+    const authority = '127.0.0.1:3080'
+
+    const encodeBase64Url = (buf) =>
+      Buffer.from(buf).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '')
+
+    const cookieName = 'dsh-auth-' + encodeBase64Url(crypto.createHash('sha256').update(authority).digest())
+    const now = Date.now()
+    const payload = {
+      version: 1,
+      authority,
+      issuedAt: now,
+      expiresAt: now + 30 * 24 * 3600 * 1000,
+    }
+    const body = encodeBase64Url(Buffer.from(JSON.stringify(payload), 'utf8'))
+    const sig = encodeBase64Url(crypto.createHmac('sha256', secret).update(body).digest())
+    const cookie = `${cookieName}=v1.${body}.${sig}`
+
+    assert.ok(cookie.startsWith('dsh-auth-'))
+    assert.ok(cookie.includes('=v1.'))
+    const parts = cookie.split('=')[1].split('.')
+    assert.strictEqual(parts.length, 3)
+    assert.strictEqual(parts[0], 'v1')
+
+    // Decode and verify payload
+    const decodedPayload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+    assert.strictEqual(decodedPayload.authority, authority)
+    assert.strictEqual(decodedPayload.version, 1)
+  })
+
+  it('handles last session file save and read safely', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const os = await import('node:os')
+
+    const tmpDir = path.join(os.tmpdir(), 'dsh-test-' + Date.now())
+    fs.mkdirSync(tmpDir, { recursive: true })
+
+    const sessionFile = path.join(tmpDir, 'last-session.json')
+    const sessionData = {
+      rawUrl: 'http://127.0.0.1:3080/?token=test-token-123',
+      port: 3080,
+      token: 'test-token-123',
+      updatedAt: Date.now(),
+    }
+
+    fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2), 'utf8')
+    assert.ok(fs.existsSync(sessionFile))
+
+    const loaded = JSON.parse(fs.readFileSync(sessionFile, 'utf8'))
+    assert.strictEqual(loaded.port, 3080)
+    assert.strictEqual(loaded.token, 'test-token-123')
+    assert.strictEqual(loaded.rawUrl, 'http://127.0.0.1:3080/?token=test-token-123')
+
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+})
+

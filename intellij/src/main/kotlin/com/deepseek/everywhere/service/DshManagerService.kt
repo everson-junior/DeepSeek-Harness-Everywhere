@@ -177,10 +177,19 @@ class DshManagerService(private val project: Project) {
             return
         }
 
+        val settings = EverywhereSettingsState.instance
+        val existing = findRunningDsh(settings.port)
+        if (existing != null) {
+            appendLog("[DeepSeek Harness] Serviço já em execução detectado na porta ${existing.first}. Utilizando instância aberta...")
+            appendLog("[DeepSeek Harness] Backend ready at: ${existing.second}")
+            setStatus(HarnessStatus.RUNNING, url = existing.second, port = existing.first)
+            notifySuccess(existing.second)
+            return
+        }
+
         setStatus(HarnessStatus.STARTING)
         appendLog("Iniciando DeepSeek Harness runtime...")
 
-        val settings = EverywhereSettingsState.instance
         val executable = findDshExecutable(settings.customDshPath)
         val workingDir = resolveWorkspaceDirectory()
         val profileArg = settings.profile.ifBlank { "web" }
@@ -254,12 +263,23 @@ class DshManagerService(private val project: Project) {
                                 val detected = extractUrlFromLine(text)
                                 if (detected != null && urlFound.compareAndSet(false, true)) {
                                     var detectedPort = 3080
+                                    var token = ""
                                     try {
                                         val uri = URI(detected)
                                         detectedPort = uri.port.takeIf { it > 0 } ?: 3080
+                                        val query = uri.query
+                                        if (query != null) {
+                                            for (param in query.split("&")) {
+                                                val pair = param.split("=")
+                                                if (pair.size == 2 && pair[0] == "token") {
+                                                    token = pair[1]
+                                                }
+                                            }
+                                        }
                                     } catch (_: Exception) {}
 
-                                    appendLog("URL detectada na saída do terminal: $detected")
+                                    saveSession(detected, detectedPort, token)
+                                    appendLog("[DeepSeek Harness] Backend ready at: $detected")
                                     setStatus(HarnessStatus.RUNNING, url = detected, port = detectedPort)
                                     notifySuccess(detected)
                                 }
@@ -298,10 +318,12 @@ class DshManagerService(private val project: Project) {
                                     instanceFollowRedirects = false
                                 }
                                 val code = conn.responseCode
-                                if (code in 200..399) {
+                                if (code in 200..399 || (code == 401 && probeDshPort(port))) {
                                     if (urlFound.compareAndSet(false, true)) {
-                                        val healthUrl = "http://127.0.0.1:$port/"
+                                        val saved = loadSavedUrl(port)
+                                        val healthUrl = if (!saved.isNullOrBlank()) saved else "http://127.0.0.1:$port/"
                                         appendLog("Health check ativo detectou serviço respondendo na porta $port (HTTP $code)")
+                                        appendLog("[DeepSeek Harness] Backend ready at: $healthUrl")
                                         setStatus(HarnessStatus.RUNNING, url = healthUrl, port = port)
                                         notifySuccess(healthUrl)
                                         break
@@ -331,12 +353,23 @@ class DshManagerService(private val project: Project) {
                 appendLog("Processo DeepSeek Harness finalizado com código $exitCode.")
 
                 if (!urlFound.get()) {
-                    if (!isRetry && exitCode == 1) {
-                        appendLog("Falha com código 1 (porta possivelmente ocupada). Limpando serviços órfãos e tentando reiniciar...")
-                        stop(silent = true)
-                        Thread.sleep(1000)
-                        start(isRetry = true)
-                        return@Thread
+                    if (exitCode == 1) {
+                        val running = findRunningDsh(settings.port)
+                        if (running != null) {
+                            appendLog("[DeepSeek Harness] Processo encerrou com código 1 pois DeepSeek Harness já está em execução na porta ${running.first}. Utilizando instância aberta...")
+                            appendLog("[DeepSeek Harness] Backend ready at: ${running.second}")
+                            setStatus(HarnessStatus.RUNNING, url = running.second, port = running.first)
+                            notifySuccess(running.second)
+                            return@Thread
+                        }
+
+                        if (!isRetry) {
+                            appendLog("Falha com código 1 (porta possivelmente ocupada). Limpando serviços órfãos e tentando reiniciar...")
+                            stop(silent = true)
+                            Thread.sleep(1000)
+                            start(isRetry = true)
+                            return@Thread
+                        }
                     }
 
                     val errMsg = "DeepSeek Harness encerrou prematuramente com código $exitCode."
@@ -461,5 +494,79 @@ class DshManagerService(private val project: Project) {
     companion object {
         fun getInstance(project: Project): DshManagerService =
             project.getService(DshManagerService::class.java)
+
+        fun getSavedSessionFile(): File {
+            val userHome = System.getProperty("user.home", "")
+            return File(userHome, ".dsh/last-session.json")
+        }
+
+        fun saveSession(rawUrl: String, port: Int, token: String?) {
+            try {
+                val file = getSavedSessionFile()
+                file.parentFile?.mkdirs()
+                val json = """
+                    {
+                      "rawUrl": "$rawUrl",
+                      "port": $port,
+                      "token": "${token ?: ""}",
+                      "updatedAt": ${System.currentTimeMillis()}
+                    }
+                """.trimIndent()
+                file.writeText(json, Charsets.UTF_8)
+            } catch (_: Exception) {}
+        }
+
+        fun loadSavedUrl(port: Int): String? {
+            try {
+                val file = getSavedSessionFile()
+                if (!file.exists()) return null
+                val content = file.readText(Charsets.UTF_8)
+                val mPort = Pattern.compile("\"port\"\\s*:\\s*$port").matcher(content)
+                if (mPort.find()) {
+                    val mUrl = Pattern.compile("\"rawUrl\"\\s*:\\s*\"([^\"]+)\"").matcher(content)
+                    if (mUrl.find()) {
+                        return mUrl.group(1).trim()
+                    }
+                }
+            } catch (_: Exception) {}
+            return null
+        }
+
+        fun probeDshPort(port: Int): Boolean {
+            if (port <= 0) return false
+            try {
+                val conn = (URL("http://127.0.0.1:$port/").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 800
+                    readTimeout = 800
+                    instanceFollowRedirects = false
+                }
+                val code = conn.responseCode
+                if (code in 200..399) {
+                    return true
+                }
+                if (code == 401) {
+                    val stream = conn.errorStream ?: conn.inputStream
+                    if (stream != null) {
+                        val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        if (body.contains("dsh web authentication required") || body.lowercase().contains("dsh")) {
+                            return true
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+            return false
+        }
+
+        fun findRunningDsh(targetPort: Int): Pair<Int, String>? {
+            val candidatePorts = listOfNotNull(targetPort.takeIf { it > 0 }, 3080, 3000).distinct()
+            for (p in candidatePorts) {
+                if (probeDshPort(p)) {
+                    val saved = loadSavedUrl(p)
+                    val url = if (!saved.isNullOrBlank()) saved else "http://127.0.0.1:$p/"
+                    return Pair(p, url)
+                }
+            }
+            return null
+        }
     }
 }

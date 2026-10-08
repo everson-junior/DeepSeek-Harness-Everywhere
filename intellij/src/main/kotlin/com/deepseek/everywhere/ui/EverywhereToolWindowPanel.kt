@@ -90,7 +90,13 @@ class EverywhereToolWindowPanel(private val project: Project) : SimpleToolWindow
         val service = DshManagerService.getInstance(project)
         service.addListener(this)
 
-        if (EverywhereSettingsState.instance.autoStart && service.status == HarnessStatus.STOPPED) {
+        val targetPort = EverywhereSettingsState.instance.port
+        val existing = DshManagerService.findRunningDsh(targetPort)
+        if (existing != null) {
+            ApplicationManager.getApplication().invokeLater {
+                service.start()
+            }
+        } else if (EverywhereSettingsState.instance.autoStart && service.status == HarnessStatus.STOPPED) {
             ApplicationManager.getApplication().invokeLater {
                 service.start()
             }
