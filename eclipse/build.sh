@@ -23,7 +23,7 @@ echo "=========================================================="
 
 BUILD_DIR="$SCRIPT_DIR/build"
 BIN_DIR="$SCRIPT_DIR/bin"
-JAR_NAME="everywhere-eclipse-${VERSION}.jar"
+JAR_NAME="com.deepseek.everywhere_${VERSION}.jar"
 TARGET_JAR="$BUILD_DIR/$JAR_NAME"
 
 mkdir -p "$BIN_DIR" "$BUILD_DIR"

@@ -228,7 +228,7 @@ O repositório possui automação completa via **GitHub Actions** ([`.github/wor
   1. **VS Code**: Compila o código TypeScript com esbuild e empacota o instalador `.vsix`. Se configurado o secret `VS_MARKETPLACE_TOKEN`, publica no Visual Studio Code Marketplace.
   2. **Visual Studio 2022**: Restaura pacotes via NuGet e compila o projeto C#/.NET com MSBuild no Windows, gerando o arquivo `Everywhere.vsix`.
   3. **IntelliJ IDEA**: Configura o ambiente Java 17 e compila o plugin via Gradle (`./gradlew buildPlugin`), gerando o pacote `everywhere-intellij-0.1.0.zip`.
-  4. **Eclipse IDE**: Configura o ambiente Java 17, compila o bundle OSGi PDE e empacota o plugin JAR (`everywhere-eclipse-0.1.0.jar`).
+  4. **Eclipse IDE**: Configura o ambiente Java 21, compila o bundle OSGi PDE e empacota o plugin JAR seguindo o padrão oficial da Eclipse Foundation (`com.deepseek.everywhere_<versao>.jar`).
 
 Todos os 4 artefatos ficam disponíveis tanto na aba **Actions** (como artefatos de workflow para download imediato) quanto anexados automaticamente aos **Assets da Release** no GitHub.
 
