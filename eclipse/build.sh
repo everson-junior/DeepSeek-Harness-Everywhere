@@ -23,8 +23,7 @@ echo "=========================================================="
 
 BUILD_DIR="$SCRIPT_DIR/build"
 BIN_DIR="$SCRIPT_DIR/bin"
-JAR_NAME="com.deepseek.everywhere_${VERSION}.jar"
-RELEASE_JAR_NAME="everywhere-eclipse-${VERSION}.jar"
+JAR_NAME="everywhere-eclipse-${VERSION}.jar"
 TARGET_JAR="$BUILD_DIR/$JAR_NAME"
 
 mkdir -p "$BIN_DIR" "$BUILD_DIR"
@@ -100,18 +99,10 @@ SOURCES=$(find src -name "*.java")
 
 # 5. Empacotar JAR OSGi
 echo "-> Empacotando bundle OSGi ($JAR_NAME)..."
-rm -f "$TARGET_JAR" "$BUILD_DIR/$RELEASE_JAR_NAME"
+rm -f "$BUILD_DIR"/*.jar
 "$JAR_BIN" cvfm "$TARGET_JAR" META-INF/MANIFEST.MF -C "$BIN_DIR" . -C . plugin.xml -C . icons
 
-# Copiar com o nome padronizado de release para publicação
-cp -f "$TARGET_JAR" "$BUILD_DIR/$RELEASE_JAR_NAME"
-# Garantir compatibilidade com nome genérico 1.0.0
-if [ "$JAR_NAME" != "com.deepseek.everywhere_1.0.0.jar" ]; then
-    cp -f "$TARGET_JAR" "$BUILD_DIR/com.deepseek.everywhere_1.0.0.jar"
-fi
-
 echo "-> Bundle gerado com sucesso em: $TARGET_JAR"
-echo "-> Cópia de release gerada em: $BUILD_DIR/$RELEASE_JAR_NAME"
 
 # 6. Instalação se solicitado
 if [ "$INSTALL" = true ]; then
