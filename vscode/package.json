@@ -1,7 +1,7 @@
 {
   "name": "everywhere",
   "displayName": "Everywhere",
-  "description": "Use DeepSeek Harness everywhere: autonomous AI agent directly inside Visual Studio Code sidebar and editor",
+  "description": "Use everywhere DeepSeek Harness: autonomous AI agent directly inside Visual Studio Code sidebar and editor",
   "version": "0.1.0",
   "icon": "assets/icon/icon.png",
   "publisher": "deepseek-ai",
